@@ -432,6 +432,30 @@
   color: var(--ael-green-base);
 }
 
+.admin-action-btn.primary {
+  background: var(--ael-green-base);
+  color: #ffffff;
+  border-color: var(--ael-green-base);
+}
+
+.admin-action-btn.primary:hover {
+  background: var(--ael-green-dark);
+  border-color: var(--ael-green-dark);
+  color: #ffffff;
+}
+
+.admin-action-btn.btn-warning {
+  color: #b45309;
+  border-color: rgba(245, 158, 11, 0.35);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.admin-action-btn.btn-warning:hover {
+  background: rgba(245, 158, 11, 0.15);
+  border-color: #d97706;
+  color: #92400e;
+}
+
 .admin-action-btn.btn-danger {
   color: #d32f2f;
   border-color: rgba(211, 47, 47, 0.25);
@@ -453,6 +477,18 @@
 .admin-action-btn.btn-publish:hover {
   background: rgba(0, 230, 118, 0.15);
   border-color: var(--ael-green-base);
+}
+
+.btn-icon.btn-danger-icon {
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.25);
+  background: #fffafa;
+}
+
+.btn-icon.btn-danger-icon:hover {
+  background: #dc2626;
+  color: #ffffff;
+  border-color: #dc2626;
 }
 
 /* ─── BOTÕES DE ÍCONE & WHATSAPP ─────────────────────────── */

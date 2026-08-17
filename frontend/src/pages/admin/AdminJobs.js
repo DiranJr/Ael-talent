@@ -52,13 +52,13 @@ export async function renderAdminJobs(params, appEl) {
         <table class="data-table">
           <thead>
             <tr>
-              <th>Título da Vaga</th>
-              <th>Departamento</th>
-              <th>Recrutador(a)</th>
-              <th>Local</th>
-              <th>Inscritos</th>
-              <th>Status</th>
-              <th style="text-align: right;">Ações</th>
+              <th style="min-width: 220px;">Título da Vaga</th>
+              <th style="min-width: 130px;">Departamento</th>
+              <th style="min-width: 150px;">Recrutador(a)</th>
+              <th style="min-width: 130px;">Local</th>
+              <th style="min-width: 85px; text-align: center;">Inscritos</th>
+              <th style="min-width: 110px; text-align: center;">Status</th>
+              <th style="min-width: 260px; text-align: right;">Ações</th>
             </tr>
           </thead>
           <tbody id="admin-jobs-tbody">
@@ -101,11 +101,11 @@ function renderJobsRows(jobs, currentUser) {
     return `
       <tr data-id="${job.joborder_id}">
         <td>
-          <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">${escHtml(job.title)}</div>
-          <div style="font-size: 0.75rem; color: var(--ael-muted);">${escHtml(job.type || 'CLT')} · Criada em ${formatDate(job.date_created)}</div>
+          <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem; line-height: 1.35;">${escHtml(job.title)}</div>
+          <div style="font-size: 0.75rem; color: var(--ael-muted); margin-top: 3px;">${escHtml(job.type || 'CLT')} · Criada em ${formatDate(job.date_created)}</div>
         </td>
         <td>
-          <span style="font-weight: 500;">${escHtml(job.department_name || 'Geral')}</span>
+          <span style="font-weight: 600; font-size: 0.8125rem; color: var(--ael-ink);">${escHtml(job.department_name || 'Geral')}</span>
         </td>
         <td>
           <div style="display: flex; align-items: center; gap: 0.35rem; font-size: 0.8125rem;">
@@ -116,50 +116,52 @@ function renderJobsRows(jobs, currentUser) {
           </div>
         </td>
         <td>
-          <span>${escHtml([job.city, job.state].filter(Boolean).join(' - ') || '—')}</span>
+          <span style="font-size: 0.8125rem;">${escHtml([job.city, job.state].filter(Boolean).join(' - ') || '—')}</span>
         </td>
-        <td>
+        <td style="text-align: center;">
           <div style="font-weight: 700; font-size: 0.9375rem; color: var(--ael-green-base);">
             ${job.total_applicants || 0}
             ${job.new_applicants > 0 ? `<span style="font-size:0.6875rem;background:var(--ael-green-accent);color:var(--ael-dark-surface);font-weight:800;padding:1px 5px;border-radius:999px;margin-left:4px;">${job.new_applicants} novos</span>` : ''}
           </div>
         </td>
-        <td>
-          <span class="status-pill status-${statusPillClass}">${statusLabel}</span>
+        <td style="text-align: center;">
+          <span class="status-pill ${statusPillClass}">${statusLabel}</span>
         </td>
         <td style="text-align: right;">
-          <div style="display: inline-flex; gap: 0.375rem; align-items: center; justify-content: flex-end;">
-            <a href="#/admin/candidates?joborder_id=${job.joborder_id}" class="admin-action-btn" title="Ver candidatos inscritos">
-              👥 Candidatos
+          <div style="display: inline-flex; gap: 0.35rem; align-items: center; justify-content: flex-end; flex-wrap: nowrap;">
+            <!-- Botão Ver Candidatos -->
+            <a href="#/admin/candidates?joborder_id=${job.joborder_id}" class="admin-action-btn primary" title="Ver candidatos inscritos nesta vaga">
+              👥 Candidatos ${job.total_applicants > 0 ? `(${job.total_applicants})` : ''}
             </a>
 
-            <!-- Ações Rápidas de Ciclo de Vida -->
+            <!-- Ações de Ciclo de Vida -->
             ${isClosed ? `
-              <button class="admin-action-btn btn-publish job-action-btn" data-action="reopen" data-id="${job.joborder_id}" title="Reabrir e publicar vaga no mural">
+              <button type="button" class="admin-action-btn btn-publish job-action-btn" data-action="reopen" data-id="${job.joborder_id}" title="Reabrir e publicar vaga no mural">
                 🔄 Reabrir
               </button>
             ` : `
               ${isPublic ? `
-                <button class="admin-action-btn job-action-btn" data-action="pause" data-id="${job.joborder_id}" title="Pausar vaga (ocultar temporariamente do portal)">
+                <button type="button" class="admin-action-btn job-action-btn" data-action="pause" data-id="${job.joborder_id}" title="Pausar vaga (ocultar temporariamente do portal)">
                   ⏸ Pausar
                 </button>
               ` : `
-                <button class="admin-action-btn btn-publish job-action-btn" data-action="publish" data-id="${job.joborder_id}" title="Publicar no portal de carreiras">
+                <button type="button" class="admin-action-btn btn-publish job-action-btn" data-action="publish" data-id="${job.joborder_id}" title="Publicar no portal de carreiras">
                   ▶ Publicar
                 </button>
               `}
 
-              <button class="admin-action-btn job-action-btn" data-action="close" data-id="${job.joborder_id}" title="Encerrar processo seletivo desta vaga">
+              <button type="button" class="admin-action-btn btn-warning job-action-btn" data-action="close" data-id="${job.joborder_id}" title="Encerrar processo seletivo desta vaga">
                 🔒 Encerrar
               </button>
             `}
 
-            <a href="#/admin/jobs/${job.joborder_id}/edit" class="admin-action-btn" title="Editar vaga">
-              ✏️ Editar
+            <!-- Ações Rápidas: Editar e Excluir em Botões de Ícone Compactos -->
+            <a href="#/admin/jobs/${job.joborder_id}/edit" class="btn-icon" title="Editar informações da vaga">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
             </a>
 
-            <button class="admin-action-btn btn-danger job-delete-btn" data-id="${job.joborder_id}" data-title="${escHtml(job.title)}" title="Excluir vaga">
-              🗑 Excluir
+            <button type="button" class="btn-icon btn-danger-icon job-delete-btn" data-id="${job.joborder_id}" data-title="${escHtml(job.title)}" title="Excluir vaga permanentemente">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
             </button>
           </div>
         </td>
