@@ -52,13 +52,13 @@ export async function renderAdminJobs(params, appEl) {
         <table class="data-table">
           <thead>
             <tr>
-              <th style="min-width: 220px;">Título da Vaga</th>
-              <th style="min-width: 130px;">Departamento</th>
-              <th style="min-width: 150px;">Recrutador(a)</th>
-              <th style="min-width: 130px;">Local</th>
-              <th style="min-width: 85px; text-align: center;">Inscritos</th>
-              <th style="min-width: 110px; text-align: center;">Status</th>
-              <th style="min-width: 260px; text-align: right;">Ações</th>
+              <th style="min-width: 200px;">Título da Vaga</th>
+              <th style="min-width: 120px;">Departamento</th>
+              <th style="min-width: 140px;">Recrutador(a)</th>
+              <th style="min-width: 120px;">Local</th>
+              <th style="min-width: 75px; text-align: center;">Inscritos</th>
+              <th style="min-width: 105px; text-align: center;">Status</th>
+              <th style="min-width: 230px; text-align: right;">Ações</th>
             </tr>
           </thead>
           <tbody id="admin-jobs-tbody">
@@ -131,7 +131,7 @@ function renderJobsRows(jobs, currentUser) {
           <div style="display: inline-flex; gap: 0.35rem; align-items: center; justify-content: flex-end; flex-wrap: nowrap;">
             <!-- Botão Ver Candidatos -->
             <a href="#/admin/candidates?joborder_id=${job.joborder_id}" class="admin-action-btn primary" title="Ver candidatos inscritos nesta vaga">
-              👥 Candidatos ${job.total_applicants > 0 ? `(${job.total_applicants})` : ''}
+              👥 Candidatos
             </a>
 
             <!-- Ações de Ciclo de Vida -->
