@@ -38,8 +38,9 @@ const storage = diskStorage({
     cb(null, UPLOAD_DIR)
   },
   filename: (req, file, cb) => {
-    // Sanitiza extensão e gera identificador único imprevisível
-    const rawExt = path.extname(file.originalname).toLowerCase()
+    // Sanitiza nome original contra path traversal e extensão
+    const sanitizedOriginal = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_')
+    const rawExt = path.extname(sanitizedOriginal).toLowerCase()
     const ext = ALLOWED_EXT.has(rawExt) ? rawExt : '.pdf'
     const randomHash = crypto.randomBytes(8).toString('hex')
     cb(null, `resume_${Date.now()}_${randomHash}${ext}`)
@@ -47,12 +48,107 @@ const storage = diskStorage({
 })
 
 function fileFilter(req, file, cb) {
-  const ext = path.extname(file.originalname).toLowerCase()
+  const originalName = file.originalname || ''
+  const ext = path.extname(originalName).toLowerCase()
+
+  // Bloqueia tentativas de path traversal no nome
+  if (originalName.includes('..') || originalName.includes('/') || originalName.includes('\\')) {
+    const cleanBase = path.basename(originalName)
+    if (!cleanBase || cleanBase.includes('..')) {
+      return cb(new Error('Nome de arquivo inválido ou tentativa de path traversal detectada.'))
+    }
+  }
 
   if (ALLOWED_MIME.has(file.mimetype) && ALLOWED_EXT.has(ext)) {
     cb(null, true)
   } else {
     cb(new Error('Formato de arquivo não suportado. Envie currículos em PDF, DOC ou DOCX.'))
+  }
+}
+
+/**
+ * Validação rigorosa por Magic Bytes (assinatura real do arquivo)
+ * @param {string} filePath
+ * @param {string} originalName
+ * @returns {Promise<{ valid: boolean, error?: string }>}
+ */
+export async function validateUploadedFile(filePath, originalName = '') {
+  if (!filePath || !fs.existsSync(filePath)) {
+    return { valid: false, error: 'Arquivo de upload não encontrado.' }
+  }
+
+  let fd = null
+  try {
+    const stats = await fs.promises.stat(filePath)
+    if (stats.size === 0) {
+      await fs.promises.unlink(filePath).catch(() => {})
+      return { valid: false, error: 'O arquivo enviado está vazio.' }
+    }
+
+    if (stats.size > MAX_FILE_SIZE) {
+      await fs.promises.unlink(filePath).catch(() => {})
+      return { valid: false, error: 'O arquivo excede o limite máximo permitido de 5MB.' }
+    }
+
+    const buffer = Buffer.alloc(Math.min(stats.size, 8192))
+    fd = await fs.promises.open(filePath, 'r')
+    await fd.read(buffer, 0, buffer.length, 0)
+    await fd.close()
+    fd = null
+
+    const ext = path.extname(originalName || filePath).toLowerCase()
+
+    // 1. PDF: Deve começar com %PDF- (0x25 0x50 0x44 0x46)
+    if (ext === '.pdf') {
+      const isPdf = buffer.length >= 4 &&
+        buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46
+      if (!isPdf) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        return { valid: false, error: 'Assinatura binária de PDF inválida ou arquivo corrompido.' }
+      }
+      return { valid: true }
+    }
+
+    // 2. DOCX: Assinatura ZIP PK (0x50 0x4B 0x03 0x04) + estrutura OpenXML
+    if (ext === '.docx') {
+      const isZip = buffer.length >= 4 &&
+        buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04
+      if (!isZip) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        return { valid: false, error: 'Assinatura de arquivo DOCX inválida (não é um pacote ZIP/OpenXML válido).' }
+      }
+
+      // Validação de estrutura Office: busca por [Content_Types].xml ou word/ nos primeiros bytes
+      const fileString = buffer.toString('binary')
+      const hasOfficeStructure = fileString.includes('[Content_Types].xml') || fileString.includes('word/')
+      if (!hasOfficeStructure) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        return { valid: false, error: 'Pacote DOCX corrompido ou sem estrutura Office válida.' }
+      }
+
+      return { valid: true }
+    }
+
+    // 3. DOC Legado (Word 97-2003): Assinatura OLE Compound Document (0xD0 0xCF 0x11 0xE0 0xA1 0xB1 0x1A 0xE1)
+    if (ext === '.doc') {
+      const isOleDoc = buffer.length >= 8 &&
+        buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0 &&
+        buffer[4] === 0xA1 && buffer[5] === 0xB1 && buffer[6] === 0x1A && buffer[7] === 0xE1
+      if (!isOleDoc) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        return { valid: false, error: 'Assinatura de documento DOC legado inválida.' }
+      }
+      return { valid: true }
+    }
+
+    await fs.promises.unlink(filePath).catch(() => {})
+    return { valid: false, error: 'Extensão de arquivo não permitida.' }
+  } catch (err) {
+    if (fd) {
+      try { await fd.close() } catch (_) {}
+    }
+    await fs.promises.unlink(filePath).catch(() => {})
+    return { valid: false, error: `Erro na validação do arquivo: ${err.message}` }
   }
 }
 
