@@ -91,9 +91,11 @@ function renderJobsRows(jobs, currentUser) {
   }
 
   return jobs.map(job => {
-    const isPublic = job.status === 'Active-Share' || job.public === 1
-    const statusLabel = isPublic ? 'Publicada' : (job.status === 'On Hold' ? 'Pausada' : (job.status === 'Closed' ? 'Encerrada' : job.status))
-    const statusPillClass = isPublic ? 'green' : (job.status === 'On Hold' ? 'amber' : 'gray')
+    const isClosed = job.status === 'Closed' || job.status === 'Canceled'
+    const isHold = job.status === 'On Hold'
+    const isPublic = !isClosed && !isHold && (job.status === 'Active-Share' || job.public === 1)
+    const statusLabel = isClosed ? 'Encerrada' : (isHold ? 'Pausada' : (isPublic ? 'Publicada' : job.status))
+    const statusPillClass = isPublic ? 'green' : (isHold ? 'amber' : 'gray')
     const isMyJob = job.recruiter_id === currentUser?.user_id
 
     return `
@@ -131,14 +133,24 @@ function renderJobsRows(jobs, currentUser) {
               👥 Candidatos
             </a>
 
-            <!-- Toggle Publicar/Pausar -->
-            ${isPublic ? `
-              <button class="admin-action-btn job-action-btn" data-action="pause" data-id="${job.joborder_id}" title="Pausar vaga (ocultar do portal)">
-                ⏸ Pausar
+            <!-- Ações Rápidas de Ciclo de Vida -->
+            ${isClosed ? `
+              <button class="admin-action-btn btn-publish job-action-btn" data-action="reopen" data-id="${job.joborder_id}" title="Reabrir e publicar vaga no mural">
+                🔄 Reabrir
               </button>
             ` : `
-              <button class="admin-action-btn btn-publish job-action-btn" data-action="publish" data-id="${job.joborder_id}" title="Publicar no portal de carreiras">
-                ▶ Publicar
+              ${isPublic ? `
+                <button class="admin-action-btn job-action-btn" data-action="pause" data-id="${job.joborder_id}" title="Pausar vaga (ocultar temporariamente do portal)">
+                  ⏸ Pausar
+                </button>
+              ` : `
+                <button class="admin-action-btn btn-publish job-action-btn" data-action="publish" data-id="${job.joborder_id}" title="Publicar no portal de carreiras">
+                  ▶ Publicar
+                </button>
+              `}
+
+              <button class="admin-action-btn job-action-btn" data-action="close" data-id="${job.joborder_id}" title="Encerrar processo seletivo desta vaga">
+                🔒 Encerrar
               </button>
             `}
 
@@ -236,18 +248,23 @@ function bindJobsEvents(appEl, jobsData, currentUser) {
 }
 
 function bindRowActions(appEl) {
-  // Ações de Toggle Status (Publicar / Pausar)
+  // Ações de Toggle Status (Publicar / Pausar / Encerrar / Reabrir)
   appEl.querySelectorAll('.job-action-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
       const id = btn.dataset.id
       const action = btn.dataset.action
       btn.disabled = true
 
+      let msg = 'Status da vaga atualizado.'
+      if (action === 'publish' || action === 'reopen') msg = 'Vaga publicada e visível no portal.'
+      else if (action === 'pause') msg = 'Vaga pausada e ocultada temporariamente do mural.'
+      else if (action === 'close') msg = 'Vaga encerrada com sucesso.'
+
       try {
         await adminToggleJobStatus(id, action)
         showToast({
           title: 'Status atualizado!',
-          message: action === 'publish' ? 'Vaga publicada no portal.' : 'Vaga pausada e ocultada do mural.',
+          message: msg,
           type: 'success'
         })
         renderAdminJobs({}, appEl)
