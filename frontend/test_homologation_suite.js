@@ -116,6 +116,7 @@ async function runHomologationSuite() {
       driver_license: 'D',
       can_relocate: '1',
       experience_years: '3 a 5 anos',
+      key_skills: 'Datamine, AutoCAD, CAT 336',
       consent_lgpd: '1',
       educations: JSON.stringify([{ level: 'Ensino Médio', course: 'Geral', institution: 'Escola Estadual', year: '2018', status: 'Concluído' }]),
       experiences: JSON.stringify([{ role: 'Operador de Escavadeira', company: 'Mineração Local', period: '2020 - 2024', activities: 'Operação de CAT 336' }])
@@ -405,6 +406,10 @@ async function runHomologationSuite() {
     const candId = 23 // Larissa Ramos (Cadastrada apenas no Banco de Talentos)
     const jobId  = 3  // Engenheiro Civil
 
+    // Limpa associação prévia para garantir idempotência em reexecuções
+    await db.query('DELETE FROM candidate_joborder_status_history WHERE candidate_id = ? AND joborder_id = ?', [candId, jobId])
+    await db.query('DELETE FROM candidate_joborder WHERE candidate_id = ? AND joborder_id = ?', [candId, jobId])
+
     const assignRes = await apiRequest({
       method: 'POST',
       path: `/api/talent-pool/candidates/${candId}/assign-job`,
@@ -619,6 +624,12 @@ async function runHomologationSuite() {
 
   const allPassed = results.every(r => r.status === 'APROVADO')
   console.log(`\nStatus Geral da Homologação: ${allPassed ? '✅ 100% APROVADO' : '❌ FALHAS ENCONTRADAS'}\n`)
+
+  await db.end()
+  process.exit(allPassed ? 0 : 1)
 }
 
-runHomologationSuite().catch(console.error)
+runHomologationSuite().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

@@ -176,6 +176,12 @@ async function runRecruiterFeatureTest() {
 
   const allPassed = results.every(r => r.status === 'APROVADO')
   console.log(`\nStatus Geral: ${allPassed ? '✅ 100% APROVADO' : '❌ FALHAS ENCONTRADAS'}\n`)
+
+  await db.end()
+  process.exit(allPassed ? 0 : 1)
 }
 
-runRecruiterFeatureTest().catch(console.error)
+runRecruiterFeatureTest().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})
