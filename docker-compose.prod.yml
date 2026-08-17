@@ -1,0 +1,95 @@
+# ==============================================================================
+# A&L Talent + OpenCATS — Docker Compose de Produção (Debian 13)
+# ==============================================================================
+services:
+
+  # ─── 1. API BACKEND (Node.js / Express) ──────────────────────────────────────
+  api:
+    image: node:20-alpine
+    container_name: ael_api_prod
+    restart: always
+    working_dir: /app
+    volumes:
+      - ./frontend:/app
+      - uploads_data:/app/opencats/upload
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-cats}
+      - DB_USER=${DB_USER:-ael_prod}
+      - DB_PASS=${DB_PASS}
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ADMIN_SESSION_SECRET=${ADMIN_SESSION_SECRET}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://carreiras.aelengenharia.com.br}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASS=${SMTP_PASS}
+      - SMTP_FROM=${SMTP_FROM}
+    ports:
+      - "127.0.0.1:3001:3001" # Apenas localmente para o Nginx
+    command: sh -c "npm install --omit=dev && node server/index.js"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ael_prod_net
+
+  # ─── 2. BANCO DE DADOS (MariaDB 10.11) ───────────────────────────────────────
+  db:
+    image: mariadb:10.11
+    container_name: ael_db_prod
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS}
+      - MYSQL_DATABASE=${DB_NAME:-cats}
+      - MYSQL_USER=${DB_USER:-ael_prod}
+      - MYSQL_PASSWORD=${DB_PASS}
+    volumes:
+      - db_data:/var/lib/mysql
+    # Sem exposição pública de portas (Acesso seguro apenas na rede ael_prod_net)
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ael_prod_net
+
+  # ─── 3. OPENCATS ENGINE (Painel Legado Interno) ──────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.php
+    container_name: ael_web_prod
+    restart: always
+    ports:
+      - "127.0.0.1:8000:80" # Restrito ao localhost / Nginx
+    volumes:
+      - ./opencats:/var/www/html
+      - uploads_data:/var/www/html/upload
+      - attachments_data:/var/www/html/attachments
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-cats}
+      - DB_USER=${DB_USER:-ael_prod}
+      - DB_PASS=${DB_PASS}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ael_prod_net
+
+volumes:
+  db_data:
+    driver: local
+  uploads_data:
+    driver: local
+  attachments_data:
+    driver: local
+
+networks:
+  ael_prod_net:
+    driver: bridge

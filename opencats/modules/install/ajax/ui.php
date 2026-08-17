@@ -1,0 +1,1163 @@
+<?php
+/*
+ * CATS
+ * AJAX Installer Interface
+ *
+ * Copyright (C) 2005 - 2007 Cognizo Technologies, Inc.
+ *
+ *
+ * The contents of this file are subject to the CATS Public License
+ * Version 1.1a (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://www.catsone.com/.
+ *
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations
+ * under the License.
+ *
+ * The Original Code is "CATS Standard Edition".
+ *
+ * The Initial Developer of the Original Code is Cognizo Technologies, Inc.
+ * Portions created by the Initial Developer are Copyright (C) 2005 - 2007
+ * (or from the year in which this file was created to the year 2007) by
+ * Cognizo Technologies, Inc. All Rights Reserved.
+ *
+ *
+ * $Id: ui.php 3807 2007-12-05 01:47:41Z will $
+ */
+
+include_once(dirname(__DIR__, 3) . '/ajax/bootstrap.php');
+
+include_once(LEGACY_ROOT . '/config.php');
+include_once(LEGACY_ROOT . '/lib/InstallationTests.php');
+include_once(LEGACY_ROOT . '/lib/CATSUtility.php');
+
+if( ini_get('safe_mode') )
+{
+	//don't do anything in safe mode
+}
+else
+{
+	/* limit the execution time to 300 secs. */
+	set_time_limit(300);
+}
+@ini_set('memory_limit', '192M');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST')
+{
+    die('Invalid request.');
+}
+
+$_REQUEST = $_POST;
+
+if (file_exists('modules.cache')) @unlink('modules.cache');
+
+if (!isset($_REQUEST['a']) || empty($_REQUEST['a']))
+{
+    die('Invalid action.');
+}
+
+$action = $_REQUEST['a'];
+
+/* Don't allow installation if ./INSTALL_BLOCK exists. */
+if (file_exists('INSTALL_BLOCK'))
+{
+    echo '
+        <script type="text/javascript">
+            setActiveStep(1);
+            showTextBlock(\'installLocked\');
+        </script>';
+    die();
+}
+
+switch ($action)
+{
+    case 'startInstall':
+        echo '
+            <script type="text/javascript">
+                setActiveStep(1);
+                showTextBlock(\'startInstall\');
+                Installpage_append(\'a=installTest\', \'Please wait while your system is tested...\');
+            </script>';
+        break;
+
+    case 'installTest':
+        $result = true;
+        $warningsOccurred = false;
+
+        echo '<br />',
+             '<span style="font-weight: bold;">Test Results</span>',
+             '<table class="test_output">';
+
+
+        InstallationTests::runInstallerTests();
+
+        if (!$result)
+        {
+            if ($warningsOccurred)
+            {
+                echo '<script type="text/javascript">showTextBlock(\'testFailedWarning\');</script>';
+
+            }
+            else
+            {
+                echo '<script type="text/javascript">showTextBlock(\'testFailed\');</script>';
+            }
+        }
+        else if ($warningsOccurred)
+        {
+            echo '<script type="text/javascript">showTextBlock(\'testWarning\');</script>';
+
+        }
+        else
+        {
+            echo '<script type="text/javascript">showTextBlock(\'testPassed\');</script>';
+        }
+
+        echo '</table>';
+        break;
+
+    case 'databaseConnectivity':
+        /* If $_REQUEST['user'] is set, we have been passed parameters to test
+         * the connection.
+         */
+        if (isset($_REQUEST['user']))
+        {
+            if (isset($_REQUEST['user']) && !empty($_REQUEST['user']))
+            {
+                CATSUtility::changeConfigSetting('DATABASE_USER', var_export($_REQUEST['user'], true));
+            }
+
+            if (isset($_REQUEST['pass']) && $_REQUEST['pass'] !== '')
+            {
+                CATSUtility::changeConfigSetting('DATABASE_PASS', var_export($_REQUEST['pass'], true));
+            }
+
+            if (isset($_REQUEST['host']) && !empty($_REQUEST['host']))
+            {
+                CATSUtility::changeConfigSetting('DATABASE_HOST', var_export($_REQUEST['host'], true));
+            }
+
+            if (isset($_REQUEST['name']) && !empty($_REQUEST['name']))
+            {
+                CATSUtility::changeConfigSetting('DATABASE_NAME', var_export($_REQUEST['name'], true));
+            }
+
+            echo '
+                <script type="text/javascript">
+                    setActiveStep(2);
+                    showTextBlock(\'databaseConnectivity\');
+                    document.getElementById(\'testDatabaseConnectivity\').disabled = true;
+                    document.getElementById(\'testDatabaseConnectivityIndicator\').style.visibility = \'visible\';
+                    Installpage_append(\'a=testDatabaseConnectivity\', \'Please wait while your connection is tested...\');
+                </script>';
+            die();
+        }
+
+        $dbPassPlaceholder = '';
+        if (DATABASE_PASS !== '')
+        {
+            $dbPassPlaceholder = 'Leave blank to keep existing password';
+        }
+
+        echo '
+            <script type="text/javascript">
+                setActiveStep(2);
+                showTextBlock(\'databaseConnectivity\');
+                document.getElementById(\'dbname\').value = \'' . htmlspecialchars(DATABASE_NAME) . '\';
+                document.getElementById(\'dbuser\').value = \'' . htmlspecialchars(DATABASE_USER) . '\';
+                document.getElementById(\'dbpass\').value = \'\';
+                document.getElementById(\'dbpass\').placeholder = \'' . $dbPassPlaceholder . '\';
+                document.getElementById(\'dbhost\').value = \'' . htmlspecialchars(DATABASE_HOST) . '\';
+            </script>';
+        break;
+
+    case 'mailSettings':
+        MySQLConnect();
+
+        if (MAIL_MAILER == 3 && MAIL_SMTP_AUTH == 1)
+            $mailOption = '4';
+        else
+            $mailOption = '';
+
+        $mailFromAddress = '';
+        if (isset($tables['settings']))
+        {
+            $recordSet = MySQLGetAssoc('SELECT value FROM settings WHERE setting = "fromAddress" LIMIT 1');
+            if (!empty($recordSet))
+            {
+                $mailFromAddress = array($recordSet['value']);
+            }
+        }
+
+        echo '
+            <script type="text/javascript">
+                setActiveStep(5);
+                showTextBlock(\'mailSettings\');
+                document.getElementById(\'mailSupport\').value = \'opt' . ($mailOption != '' ? $mailOption : htmlspecialchars(MAIL_MAILER)) . '\';
+                document.getElementById(\'mailSendmail\').value = \'' . htmlspecialchars(MAIL_SENDMAIL_PATH) . '\';
+                document.getElementById(\'mailSmtpHost\').value = \'' . htmlspecialchars(MAIL_SMTP_HOST) . '\';
+                document.getElementById(\'mailSmtpPort\').value = \'' . htmlspecialchars(MAIL_SMTP_PORT) . '\';
+                document.getElementById(\'mailSmtpUsername\').value = \'' . htmlspecialchars(MAIL_SMTP_USER) . '\';
+                document.getElementById(\'mailSmtpPassword\').value = \'' . htmlspecialchars(MAIL_SMTP_PASS) . '\';
+                document.getElementById(\'mailFromAddress\').value = \'' . htmlspecialchars($mailFromAddress[0]) . '\';
+                changeMailForm();
+            </script>';
+        break;
+
+    case 'setMailSettings':
+        $mailSupportTxt = $_REQUEST['mailSupport'];
+        $mailSendmailPath = trim($_REQUEST['mailSendmail']);
+        $mailSmtpHost = trim($_REQUEST['mailSmtpHost']);
+        $mailSmtpPort = intval(trim($_REQUEST['mailSmtpPort']));
+        $mailSmtpUsername = trim($_REQUEST['mailSmtpUsername']);
+        $mailSmtpPassword = trim($_REQUEST['mailSmtpPassword']);
+        $fromAddress = substr(trim($_REQUEST['mailFromAddress']), 0, 255);
+
+        // validate e-mail address reply-to field
+        if(strlen($fromAddress) < 4)
+        {
+            echo('
+                <script type="text/javascript">
+                    setActiveStep(5);
+                    showTextBlock(\'mailSettings\');
+                    var objLabel = document.getElementById(\'mailFromAddressLabel\');
+                    objLabel.style.color = \'#ff0000\';
+                    changeMailForm();
+                    alert(\'You must enter your e-mail address to continue.\');
+                </script>
+                '
+            );
+        }
+        else
+        {
+            if(strlen($mailSupportTxt) == 4)
+            {
+                $mailSupport = intval(substr($mailSupportTxt, 3, 1));
+            }
+
+            if ($mailSupport == 4)
+            {
+                CATSUtility::changeConfigSetting('MAIL_MAILER', '3');
+                CATSUtility::changeConfigSetting('MAIL_SMTP_AUTH', 'true');
+            }
+            else
+            {
+                CATSUtility::changeConfigSetting('MAIL_MAILER', sprintf('%d', $mailSupport));
+                CATSUtility::changeConfigSetting('MAIL_SMTP_AUTH', 'false');
+            }
+
+            CATSUtility::changeConfigSetting('MAIL_SENDMAIL_PATH', var_export($mailSendmailPath, true));
+            CATSUtility::changeConfigSetting('MAIL_SMTP_HOST', var_export($mailSmtpHost, true));
+            CATSUtility::changeConfigSetting('MAIL_SMTP_PORT', sprintf('%d', $mailSmtpPort));
+            CATSUtility::changeConfigSetting('MAIL_SMTP_USER', var_export($mailSmtpUsername, true));
+            CATSUtility::changeConfigSetting('MAIL_SMTP_PASS', var_export($mailSmtpPassword, true));
+
+            @session_name(CATS_SESSION_NAME);
+            session_start();
+
+            $_SESSION['fromAddressInstaller'] = $fromAddress;
+
+            echo '<script type="text/javascript">
+                      setActiveStep(6);
+                      showTextBlock(\'detectingOptional\');
+                      setTimeout("Installpage_populate(\'a=optionalComponents\');", 5000);
+                  </script>';
+        }
+        break;
+
+    case 'testDatabaseConnectivity':
+        echo '<br /><span style="font-weight: bold;">Test Results</span>';
+
+        echo '<table class="test_output">';
+
+        if (InstallationTests::checkMySQL(DATABASE_HOST, DATABASE_USER, DATABASE_PASS, DATABASE_NAME))
+        {
+            echo '<script type="text/javascript">showTextBlock(\'MySQLTestPassed\');</script>';
+        }
+        else
+        {
+            echo '<script type="text/javascript">showTextBlock(\'MySQLTestFailed\');</script>';
+        }
+
+        echo '</table>';
+
+        echo '
+            <script type="text/javascript">
+                document.getElementById(\'testDatabaseConnectivity\').disabled = false;
+                document.getElementById(\'testDatabaseConnectivityIndicator\').style.visibility = \'hidden\';
+            </script>';
+        break;
+
+    case 'resumeParsing':
+        echo '<script type="text/javascript">setActiveStep(4);</script>';
+
+        if (ANTIWORD_PATH == '')
+        {
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'docEnabled\').checked = false;
+                    document.getElementById(\'docExecutable\').disabled = true;
+                    document.getElementById(\'docExecutable\').value = \'\';
+                    document.getElementById(\'docExecutableOrg\').value = \'\';
+                </script>';
+        }
+        else
+        {
+            $antiwordWithSlashes = str_replace('\\', '\\\\', ANTIWORD_PATH);
+
+            include_once ('lib/SystemUtility.php');
+            /* Change Windows default command to UNIX default command hack. */
+            if (strpos(strtolower($antiwordWithSlashes), "c:\\") === 0 && !SystemUtility::isWindows())
+            {
+                $antiwordWithSlashes = '/usr/bin/antiword';
+            }
+
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'docEnabled\').checked = true;
+                    document.getElementById(\'docExecutable\').disabled = false;
+                    document.getElementById(\'docExecutable\').value = \'' . $antiwordWithSlashes . '\';
+                    document.getElementById(\'docExecutableOrg\').value = \'' . $antiwordWithSlashes . '\';
+                </script>';
+        }
+
+        if (PDFTOTEXT_PATH == '')
+        {
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'pdfEnabled\').checked = false;
+                    document.getElementById(\'pdfExecutable\').disabled = true;
+                    document.getElementById(\'pdfExecutable\').value = \'\';
+                    document.getElementById(\'pdfExecutableOrg\').value = \'\';
+                </script>';
+        }
+        else
+        {
+            $pdftotextWithSlashes = str_replace('\\', '\\\\', PDFTOTEXT_PATH);
+
+            include_once ('lib/SystemUtility.php');
+            /* Change Windows default command to UNIX default command hack. */
+            if (strpos(strtolower($pdftotextWithSlashes), "c:\\") === 0 && !SystemUtility::isWindows())
+            {
+                $pdftotextWithSlashes = '/usr/bin/pdftotext';
+            }
+
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'pdfEnabled\').checked = true;
+                    document.getElementById(\'pdfExecutable\').disabled = false;
+                    document.getElementById(\'pdfExecutable\').value = \'' . $pdftotextWithSlashes . '\';
+                    document.getElementById(\'pdfExecutableOrg\').value = \'' . $pdftotextWithSlashes . '\';
+                </script>';
+        }
+
+        if (HTML2TEXT_PATH == '')
+        {
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'htmlEnabled\').checked = false;
+                    document.getElementById(\'htmlExecutable\').disabled = true;
+                    document.getElementById(\'htmlExecutable\').value = \'\';
+                    document.getElementById(\'htmlExecutableOrg\').value = \'\';
+                </script>';
+        }
+        else
+        {
+            $html2textWithSlashes = str_replace('\\', '\\\\', HTML2TEXT_PATH);
+
+            include_once ('lib/SystemUtility.php');
+            /* Change Windows default command to UNIX default command hack. */
+            if (strpos(strtolower($html2textWithSlashes), "c:\\") === 0 && !SystemUtility::isWindows())
+            {
+                $html2textWithSlashes = '/usr/bin/html2text';
+            }
+
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'htmlEnabled\').checked = true;
+                    document.getElementById(\'htmlExecutable\').disabled = false;
+                    document.getElementById(\'htmlExecutable\').value = \'' . $html2textWithSlashes . '\';
+                    document.getElementById(\'htmlExecutableOrg\').value = \'' . $html2textWithSlashes . '\';
+                </script>';
+        }
+
+        if (UNRTF_PATH == '')
+        {
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'rtfEnabled\').checked = false;
+                    document.getElementById(\'rtfExecutable\').disabled = true;
+                    document.getElementById(\'rtfExecutable\').value = \'\';
+                    document.getElementById(\'rtfExecutableOrg\').value = \'\';
+                </script>';
+        }
+        else
+        {
+            $unrtfWithSlashes = str_replace('\\', '\\\\', UNRTF_PATH);
+
+            include_once ('lib/SystemUtility.php');
+            /* Change Windows default command to UNIX default command hack. */
+            if (strpos(strtolower($unrtfWithSlashes), "c:\\") === 0 && !SystemUtility::isWindows())
+            {
+                $unrtfWithSlashes = '/usr/bin/unrtf';
+            }
+
+            echo '
+                <script type="text/javascript">
+                    document.getElementById(\'rtfEnabled\').checked = true;
+                    document.getElementById(\'rtfExecutable\').disabled = false;
+                    document.getElementById(\'rtfExecutable\').value = \'' . $unrtfWithSlashes . '\';
+                    document.getElementById(\'rtfExecutableOrg\').value = \'' . $unrtfWithSlashes . '\';
+                </script>';
+        }
+
+        echo '<script type="text/javascript">showTextBlock(\'resumeParsing\');</script>';
+        break;
+
+    case 'testResumeParsing':
+        echo '
+            <script type="text/javascript">
+                showTextBlock(\'resumeParsing\');
+                Installpage_append(\'a=testResumeParsing2\', \'Please wait while your settings are tested...\');
+            </script>';
+
+        $antiwordPath = $_REQUEST['docExecutable'];
+        CATSUtility::changeConfigSetting('ANTIWORD_PATH', var_export($antiwordPath, true));
+
+        $pdftotextPath = $_REQUEST['pdfExecutable'];
+        CATSUtility::changeConfigSetting('PDFTOTEXT_PATH', var_export($pdftotextPath, true));
+
+        $html2textPath = $_REQUEST['htmlExecutable'];
+        CATSUtility::changeConfigSetting('HTML2TEXT_PATH', var_export($html2textPath, true));
+
+        $unrtfPath = $_REQUEST['rtfExecutable'];
+        CATSUtility::changeConfigSetting('UNRTF_PATH', var_export($unrtfPath, true));
+
+        break;
+
+    case 'testResumeParsing2':
+        echo '<script type="text/javascript">showTextBlock(\'resumeParsing\');</script>';
+
+        $result = true;
+
+        echo '<br />',
+             '<span style="font-weight: bold;">Test Results</span>',
+             '<table class="test_output">';
+
+        $antiwordResults = !(ANTIWORD_PATH != '' && !InstallationTests::checkAntiword());
+        $pdftotextResults = !(PDFTOTEXT_PATH != '' && !InstallationTests::checkPdftotext());
+        $html2textResults = !(HTML2TEXT_PATH != '' && !InstallationTests::checkHtml2text());
+        if (UNRTF_PATH != '' && !$html2textResults)
+        {
+            echo '<tr class="fail"><td>UnRTF depends on Html2Text and can not execute.</td></tr>';
+            $unrtfResults = false;
+        }
+        else
+        {
+            $unrtfResults = !(UNRTF_PATH != '' && !InstallationTests::checkUnrtf());
+        }
+
+        if (!$antiwordResults || !$pdftotextResults)
+        {
+            echo '<script type="text/javascript">showTextBlock(\'testFailed\');</script>';
+        }
+        else
+        {
+            echo '<script type="text/javascript">showTextBlock(\'testPassedParsing\');</script>';
+        }
+
+        break;
+
+    case 'optionalComponents':
+        MySQLConnect();
+        initializeOptionalComponents();
+
+        echo '<script type="text/javascript">';
+
+        /* Detect date format preferences. */
+        $record = MySQLGetAssoc('SELECT date_format_ddmmyy FROM site LIMIT 1', true);
+
+        if (!isset($record['date_format_ddmmyy']) || $record['date_format_ddmmyy'] == 0)
+        {
+            echo 'document.getElementById(\'dateFormat\').value = \'mdy\';';
+        }
+        else
+        {
+            echo 'document.getElementById(\'dateFormat\').value = \'dmy\';';
+        }
+
+        /* Detect default phone country calling code. */
+        $defaultPhoneCountryCodeDigits = '';
+        $rsPhoneCountryCode = MySQLQuery('SELECT default_phone_country_code FROM site', true);
+        if ($rsPhoneCountryCode)
+        {
+            $phoneCountryCodeRecord = mysqli_fetch_assoc($rsPhoneCountryCode);
+            if (isset($phoneCountryCodeRecord['default_phone_country_code']))
+            {
+                $defaultPhoneCountryCodeDigits = preg_replace(
+                    '/[^0-9]/',
+                    '',
+                    trim($phoneCountryCodeRecord['default_phone_country_code'])
+                );
+            }
+        }
+        echo 'document.getElementById(\'defaultPhoneCountryCodeDigits\').value = \'' . addslashes($defaultPhoneCountryCodeDigits) . '\';';
+
+        echo 'setActiveStep(6);';
+        echo 'showTextBlock(\'pickOptionalComponents\');';
+        echo '</script>';
+
+        $onClick  = 'document.getElementById(\'pickOptionalComponents\').style.display = \'none\'; ';
+        $onClick .= 'showTextBlock(\'installingComponentsExtra\'); ';
+        $onClick .= 'Installpage_populate(\'a=setupOptional&list=';
+        foreach ($optionalComponents as $index => $component)
+        {
+            $onClick .= htmlspecialchars($index) . ',\' + encodeURIComponent(getCheckedValue(document.getElementsByName(\'' . htmlspecialchars($index) . '\'))) + \',';
+        }
+        $onClick .= '&timeZone=\' + encodeURIComponent(document.getElementById(\'timeZone\').value) + \'';
+        $onClick .= '&dateFormat=\' + encodeURIComponent(document.getElementById(\'dateFormat\').value) + \'';
+        $onClick .= '&timeFormat=\' + encodeURIComponent(document.getElementById(\'timeFormat\').value) + \'';
+        $onClick .= '&defaultPhoneCountryCodeDigits=\' + encodeURIComponent(document.getElementById(\'defaultPhoneCountryCodeDigits\').value));';
+
+        echo '<script type="text/javascript">';
+        echo 'var onClick = \'' . addslashes($onClick) . '\';';
+        echo 'document.getElementById(\'extrasList\').innerHTML = \'<table style="width: 450px;"><tr><td style="font-weight: bold;">Feature Name</td><td style="width: 85px; font-weight: bold">Install</td><td style="width: 85px; font-weight: bold">Do Not Install</td></tr>';
+        foreach ($optionalComponents as $index => $component)
+        {
+            echo '<tr>';
+            echo '<td><a href="javascript:void(0);" onclick="function HTML' . htmlspecialchars($index) . '() { return \\\'<p style=\\\' + String.fromCharCode(34) + \\\'font-weight: bold; padding-left: 8px; padding-right: 8px;\\\' + String.fromCharCode(34) + \\\'>' . htmlspecialchars($component['name']) . '</p><p style=\\\' + String.fromCharCode(34) + \\\'padding-left: 8px; padding-right: 8px;\\\' + String.fromCharCode(34) + \\\'>' . htmlspecialchars($component['description']) . '</p>\\\'; } showPopWinHTML(HTML' . htmlspecialchars($index) . '(), 400, 100, null); return false;">' . htmlspecialchars($component['name']) . '</a>&nbsp;&nbsp;&nbsp;</td>';
+            echo '<td><input type="radio" name="' . htmlspecialchars($index) . '" value="true"' . ($component['componentExists'] ? ' checked' : '') . '></td>';
+            echo '<td><input type="radio" name="' . htmlspecialchars($index) . '" value="false"' . ($component['componentExists'] ? '' : ' checked') . '></td>';
+            echo '</tr>';
+        }
+
+        echo '</table><br /><br />';
+
+        echo '<input type="button" style="float: right;" class="button" value="Next -->" onclick="\' + onClick + \'">\';</script>';
+        break;
+
+    case 'setupOptional':
+        MySQLConnect();
+        initializeOptionalComponents();
+
+        @session_name(CATS_SESSION_NAME);
+        session_start();
+
+        // FIXME: Input validation.
+        $timeZone = $_REQUEST['timeZone'];
+        CATSUtility::changeConfigSetting('OFFSET_GMT', ($timeZone));
+
+        $dateFormat = $_REQUEST['dateFormat'];
+        $timeFormat = isset($_REQUEST['timeFormat']) ? $_REQUEST['timeFormat'] : '12';
+
+        $_SESSION['timeZoneInstaller'] = $timeZone;
+        $_SESSION['dateFormatInstaller'] = $dateFormat;
+        $_SESSION['timeFormatInstaller'] = $timeFormat;
+
+        // Default phone country calling code collected in the installer.
+        if (isset($_REQUEST['defaultPhoneCountryCodeDigits']))
+        {
+            $defaultPhoneCountryCodeDigits = trim($_REQUEST['defaultPhoneCountryCodeDigits']);
+
+            // Keep digits only; client-side JavaScript should already enforce this.
+            $defaultPhoneCountryCodeDigits = preg_replace('/[^0-9]/', '', $defaultPhoneCountryCodeDigits);
+
+            if ($defaultPhoneCountryCodeDigits !== '')
+            {
+                $_SESSION['defaultPhoneCountryCodeInstaller'] = '+' . $defaultPhoneCountryCodeDigits;
+            }
+            else
+            {
+                // Fall back to the historical default if nothing was provided.
+                $_SESSION['defaultPhoneCountryCodeInstaller'] = '+1';
+            }
+        }
+        else
+        {
+            // No value provided in the request, keep the historical default.
+            $_SESSION['defaultPhoneCountryCodeInstaller'] = '+1';
+        }
+
+        $list = explode(',', $_REQUEST['list']);
+
+        for ($i = 0; $i < count($list); $i+=2)
+        {
+            if (!isset($list[$i+1]))
+            {
+                continue;
+            }
+
+            if ($optionalComponents[$list[$i]]['componentExists'] == false)
+            {
+                if ($list[$i+1] == 'true')
+                {
+                    eval($optionalComponents[$list[$i]]['installCode']);
+                }
+            }
+            else
+            {
+                if ($list[$i+1] == 'false')
+                {
+                    eval($optionalComponents[$list[$i]]['removeCode']);
+                }
+            }
+        }
+
+        echo '<script type="text/javascript">
+                  setActiveStep(7);
+                  showTextBlock(\'installingComponentsMaint\');
+                  setTimeout("Installpage_populate(\'a=maint\');", 5000);
+              </script>';
+        break;
+
+    case 'detectRevision':
+        MySQLConnect();
+
+        echo '<script type="text/javascript">setActiveStep(3);</script>';
+
+        if (count($tables) == 0)
+        {
+            echo '<script type="text/javascript">
+                      showTextBlock(\'emptyDatabase\');
+                      document.getElementById(\'emptyCheckBox\').checked = true;
+                  </script>';
+            die();
+        }
+
+        if (isset($tables['site']) && isset($tables['candidate']) && isset($tables['history']))
+        {
+            echo '
+                <script type="text/javascript">
+                    showTextBlock(\'catsUpToDate\');
+                    document.getElementById(\'currentCheckBox\').checked = true;
+                </script>';
+
+            echo '<br /><br />';
+            die();
+        }
+        echo '
+            <script type="text/javascript">
+                showTextBlock(\'unknownDataInDatabase\');
+                document.getElementById(\'tableNamesUnknown\').innerHTML = \'\';
+            </script>';
+
+        foreach ($tables as $table => $data)
+        {
+            echo '<script type="text/javascript">document.getElementById(\'tableNamesUnknown\').innerHTML += \'' . htmlspecialchars($table ) . ', \';</script>';
+        }
+        break;
+
+    case 'queryResetDatabase':
+        echo '<script type="text/javascript">showTextBlock(\'queryResetDatabase\');</script>';
+        break;
+
+    case 'resetDatabase':
+        @session_name(CATS_SESSION_NAME);
+        session_start();
+
+        unset($_SESSION['existingUpgradeMaintStarted']);
+        unset($_SESSION['existingUpgradeMaintComplete']);
+
+        MySQLConnect();
+
+        foreach ($tables as $table => $data)
+        {
+            $queryResult = MySQLQuery(sprintf("DROP TABLE %s", $table));
+        }
+
+        if(!isset($_REQUEST['type']))
+        {
+            echo '<script type="text/javascript">Installpage_populate(\'a=detectRevision\');</script>';
+        }
+        else
+        {
+            echo '<script type="text/javascript">Installpage_populate(\'a=selectDBType&type=' . urlencode($_REQUEST['type']) . '\');</script>';
+        }
+        break;
+
+    case 'selectDBType':
+        $type = $_REQUEST['type'];
+
+        switch ($type)
+        {
+            case 'empty':
+                echo '<script type="text/javascript">
+                          showTextBlock(\'installingComponents\');
+                          Installpage_populate(\'a=doInstallEmptyDatabase\');
+                      </script>';
+                break;
+
+            case 'demo':
+                echo '<script type="text/javascript">showTextBlock(\'queryInstallDemo\');</script>';
+                break;
+
+            case 'restore':
+                echo '<script type="text/javascript">
+                          document.getElementById(\'continueRestoreCheck\').checked = false;
+                          showTextBlock(\'queryInstallBackup\');
+                      </script>';
+                break;
+
+            default:
+                break;
+        }
+        break;
+
+    case 'restoreFromBackup':
+        include_once(LEGACY_ROOT . '/lib/FileCompressor.php');
+        MySQLConnect();
+        $extractor = new ZipFileExtractor('./restore/catsbackup.bak');
+
+        CATSUtility::changeConfigSetting('ENABLE_DEMO_MODE', 'false');
+
+        /* Extract the file.  This command also executes all sql commands in the file. */
+        /* Normally, we could just do the following lines, but we want a custom extractor
+           that ignores the file 'database', and executes all of the catsbackup.sql.xxx
+           files rather than extracting them. */
+        /*
+            if (!$extractor->open() || !$extractor->extractAll())
+            {
+                echo($extractor->getErrorMessage());
+            }
+        */
+
+        if (!$extractor->open())
+        {
+            echo($extractor->getErrorMessage());
+        }
+
+        $metaData = $extractor->getMetaData();
+
+        foreach ($metaData['centralDirectory'] as $index => $data)
+        {
+            $fileName = $data['filename'];
+
+            /* Execute all sql files */
+            if (strpos($fileName, 'db/catsbackup.sql.') === 0)
+            {
+                $fileContents = $extractor->getFile($index);
+                MySQLQueryMultiple($fileContents, '((ENDOFQUERY))');
+            }
+            /* Extract everything else but ./database */
+            else if ($fileName != 'database')
+            {
+                if (strpos($fileName, '/') !== false)
+                {
+                    $directorySplit = explode('/', $fileName);
+                    unset($directorySplit[count($directorySplit)-1]);
+                    $directory = implode('/', $directorySplit);
+                    @mkdir($directory, 0777, true);
+                }
+
+                $fileContents = $extractor->getFile($index);
+
+                if ($fileContents === false)
+                {
+                    /* Report error? */
+                }
+
+                file_put_contents ($fileName, $fileContents);
+            }
+        }
+
+        echo '<script type="text/javascript">Installpage_populate(\'a=resumeParsing\');</script>';
+        break;
+
+    case 'doDeleteBackup':
+        echo '<script type="text/javascript">Installpage_populate(\'a=detectRevision\', \'subFormBlock\', \'\');</script>';
+        break;
+
+    case 'doInstallEmptyDatabase':
+        MySQLConnect();
+
+        CATSUtility::changeConfigSetting('ENABLE_DEMO_MODE', 'false');
+
+        $schema = readInstallSQLFile('db/cats_schema.sql');
+        MySQLQueryMultiple($schema, ";\n");
+
+        echo '<script type="text/javascript">Installpage_populate(\'a=resumeParsing\');</script>';
+        break;
+
+    case 'onLoadDemoData':
+        CATSUtility::changeConfigSetting('ENABLE_DEMO_MODE', 'true');
+
+        MySQLConnect();
+        /* Demo mode installs the current schema and then demo-only seed data. */
+        $schema = readInstallSQLFile('db/cats_schema.sql');
+        MySQLQueryMultiple($schema, ";\n");
+
+        $demoData = readInstallSQLFile('db/cats_demo_data.sql');
+        MySQLQueryMultiple($demoData, ";\n");
+
+        echo '
+            <script type="text/javascript">
+                showTextBlock(\'installingComponents\');
+                Installpage_populate(\'a=resumeParsing\');
+            </script>';
+        break;
+
+    case 'maint':
+        @session_name(CATS_SESSION_NAME);
+        session_start();
+
+        if (isset($_SESSION['existingUpgradeMaintComplete']))
+        {
+            unset($_SESSION['existingUpgradeMaintStarted']);
+            unset($_SESSION['existingUpgradeMaintComplete']);
+
+            echo '<script type="text/javascript">Installpage_populate(\'a=reindexResumes\');</script>';
+            break;
+        }
+
+        if (isset($_SESSION['CATS']))
+        {
+            unset($_SESSION['CATS']);
+        }
+
+        if (isset($_SESSION['modules']))
+        {
+            unset($_SESSION['modules']);
+        }
+
+        echo '<script type="text/javascript">
+                  showTextBlock(\'installingComponentsMaint\');
+                  setTimeout("Installpage_maint();", 2000);
+              </script>';
+        break;
+
+    case 'upgradeExisting':
+        @session_name(CATS_SESSION_NAME);
+        session_start();
+
+        $_SESSION['existingUpgradeMaintStarted'] = true;
+        unset($_SESSION['existingUpgradeMaintComplete']);
+
+        if (isset($_SESSION['CATS']))
+        {
+            unset($_SESSION['CATS']);
+        }
+
+        if (isset($_SESSION['modules']))
+        {
+            unset($_SESSION['modules']);
+        }
+
+        echo '<script type="text/javascript">
+                  showTextBlock(\'installingComponentsMaint\');
+                  setTimeout("Installpage_upgradeExistingMaint();", 2000);
+              </script>';
+        break;
+
+    case 'upgradeExistingMaintComplete':
+        @session_name(CATS_SESSION_NAME);
+        session_start();
+
+        if (isset($_SESSION['existingUpgradeMaintStarted']))
+        {
+            $_SESSION['existingUpgradeMaintComplete'] = true;
+            unset($_SESSION['existingUpgradeMaintStarted']);
+        }
+
+        echo '<script type="text/javascript">Installpage_populate(\'a=resumeParsing\');</script>';
+        break;
+
+    case 'reindexResumes':
+        echo '<script type="text/javascript">
+                  showTextBlock(\'installingComponentsMaintResume\');
+                  Installpage_populate(\'a=onReindexResumes\');
+              </script>';
+        break;
+
+    case 'onReindexResumes':
+        include_once(LEGACY_ROOT . '/modules/install/ajax/attachmentsReindex.php');
+
+        echo '<script type="text/javascript">
+                  Installpage_populate(\'a=maintComplete\');
+              </script>';
+
+        break;
+
+    case 'maintComplete':
+        MySQLConnect();
+
+        // FIXME: Make sure we have permissions to create INSTALL_BLOCK.
+        file_put_contents(
+            'INSTALL_BLOCK',
+            'This file prevents the installer from running. Remove this file to edit or reset your CATS installation.'
+        );
+
+        @session_name(CATS_SESSION_NAME);
+        session_start();
+
+
+        $fromAddress = $_SESSION['fromAddressInstaller'];
+
+        // If this is an existing database, just set all the fromAddress settings to new
+        $db->query(sprintf('UPDATE settings SET value = %s WHERE setting = "fromAddress"', $db->makeQueryString($fromAddress)));
+        // This is a new install, insert the default settings.
+        if ($db->getAffectedRows() == 0)
+        {
+            $db->query(sprintf(
+                'INSERT INTO settings (setting, value, settings_type) VALUES ("fromAddress", %s, 1)',
+                $db->makeQueryString($fromAddress)
+            ));
+            $db->query(
+                'INSERT INTO settings (setting, value, settings_type) VALUES ("configured", "1", 1)'
+            );
+        }
+
+        /* We can't set date format ortime zone until installer is complete
+         * (rows don't exist in schema till now.)
+         */
+
+        $dateFormat = $_SESSION['dateFormatInstaller'];
+
+        if ($dateFormat == 'mdy')
+        {
+            MySQLQuery('UPDATE site SET date_format_ddmmyy = 0');
+        }
+        else
+        {
+            MySQLQuery('UPDATE site SET date_format_ddmmyy = 1');
+        }
+
+        $timeFormat = isset($_SESSION['timeFormatInstaller']) ? $_SESSION['timeFormatInstaller'] : '12';
+        MySQLQuery('UPDATE site SET time_format_24 = ' . ($timeFormat === '24' ? 1 : 0));
+
+        $timeZone = $_SESSION['timeZoneInstaller'];
+
+        MySQLQuery(sprintf("UPDATE site SET time_zone = %s", $timeZone));
+
+        if (isset($_SESSION['defaultPhoneCountryCodeInstaller'])
+            && $_SESSION['defaultPhoneCountryCodeInstaller'] !== '')
+        {
+            $defaultPhoneCountryCode = $_SESSION['defaultPhoneCountryCodeInstaller'];
+
+            // The value is expected to be in the form "+1", "+49", "+44", etc.
+            MySQLQuery(sprintf(
+                "UPDATE site SET default_phone_country_code = '%s'",
+                $defaultPhoneCountryCode
+            ));
+        }
+
+        if (isset($_SESSION['CATS']))
+        {
+            unset($_SESSION['CATS']);
+        }
+
+        if (isset($_SESSION['modules']))
+        {
+            unset($_SESSION['modules']);
+        }
+
+        echo '<script type="text/javascript">setActiveStep(7);</script>';
+
+        if (ENABLE_DEMO_MODE)
+        {
+            echo '<script type="text/javascript">showTextBlock("installCompleteDemo");</script>';
+        }
+        else
+        {
+            echo '<script type="text/javascript">showTextBlock("installCompleteProd");</script>';
+        }
+        break;
+
+    case 'loginCATS':
+        MySQLConnect();
+
+        /* Determine if a default user is set. */
+        $record = MySQLGetAssoc(
+            "SELECT user_id FROM user WHERE user_name = 'admin' AND password = md5('cats') LIMIT 1"
+        );
+        if (!empty($record))
+        {
+            //Default user set
+            echo '<script type="text/javascript">document.location.href="index.php?defaultlogin=true";</script>';
+        }
+        else
+        {
+            echo '<script type="text/javascript">document.location.href="index.php";</script>';
+        }
+        break;
+
+    default:
+        die('Invalid action.');
+        break;
+}
+
+function MySQLConnect()
+{
+    global $tables, $mySQLConnection, $db;
+
+    $mySQLConnection = @mysqli_connect(
+        DATABASE_HOST, DATABASE_USER, DATABASE_PASS
+    );
+
+    if (!$mySQLConnection)
+    {
+				$error = "errno: " . mysqli_connect_errno() . ", ";
+				$error .= "error: " . mysqli_connect_error();
+
+        die(
+            '<p style="background: #ec3737; padding: 4px; margin-top: 0; font:'
+            . ' normal normal bold 12px/130% Arial, Tahoma, sans-serif;">Error '
+            . " Connecting to Database</p><pre>\n\n" . $error . "</pre>\n\n"
+        );
+        return false;
+    }
+
+    mysqli_set_charset($mySQLConnection, SQL_CHARACTER_SET);
+
+    include_once(LEGACY_ROOT . '/lib/DatabaseConnection.php');
+    $db = getInstallerDatabaseConnection();
+
+    /* Create an array of all tables in the database. */
+    $tables = array();
+    $resultSet = MySQLGetAllAssoc(sprintf("SHOW TABLES FROM `%s`", DATABASE_NAME));
+    foreach ($resultSet as $row)
+    {
+        $tableName = reset($row);
+        $tables[$tableName] = true;
+    }
+
+    /* Select CATS database. */
+    $isDBSelected = @mysqli_select_db($mySQLConnection, DATABASE_NAME);
+    if (!$isDBSelected)
+    {
+				$error = "errno: " . mysqli_connect_errno() . ", ";
+				$error .= "error: " . mysqli_connect_error();
+
+        die(
+            '<p style="background: #ec3737; padding: 4px; margin-top: 0; font:'
+            . ' normal normal bold 12px/130% Arial, Tahoma, sans-serif;">Error'
+            . " Selecting Database</p><pre>\n\n" . $error . "</pre>\n\n"
+        );
+        return false;
+    }
+}
+
+function getInstallerDatabaseConnection()
+{
+    global $db;
+
+    if (is_object($db) && method_exists($db, 'query'))
+    {
+        return $db;
+    }
+
+    return DatabaseConnection::getInstance();
+}
+
+function MySQLQuery($query, $ignoreErrors = false)
+{
+    global $mySQLConnection;
+
+    $queryResult = mysqli_query($mySQLConnection, $query);
+
+    if (!$mySQLConnection)
+    {
+		$error = "errno: " . mysqli_connect_errno() . ", ";
+		$error .= "error: " . mysqli_connect_error();
+
+        die (
+            '<p style="background: #ec3737; padding: 4px; margin-top: 0; font:'
+            . ' normal normal bold 12px/130% Arial, Tahoma, sans-serif;">Query'
+            . " Error -- Please Report This Bug!</p><pre>\n\nMySQL Query "
+            . "Failed: " . $error . "\n\n" . $query . "</pre>\n\n"
+        );
+        return false;
+    }
+
+    return $queryResult;
+}
+
+function getInstalledTableFields($table)
+{
+    $fields = array();
+    $fieldMeta = MySQLGetAllAssoc(sprintf('SHOW COLUMNS FROM %s', $table), true);
+    foreach ($fieldMeta as $meta)
+    {
+        if (isset($meta['Field']))
+        {
+            $fields[$meta['Field']] = true;
+        }
+    }
+    return $fields;
+}
+
+function MySQLGetAssoc($query, $ignoreErrors = false)
+{
+    global $db;
+
+    if (!$db->query($query, $ignoreErrors))
+    {
+        return array();
+    }
+
+    return $db->getAssoc();
+}
+
+function MySQLGetAllAssoc($query, $ignoreErrors = false)
+{
+    global $db;
+
+    if (!$db->query($query, $ignoreErrors))
+    {
+        return array();
+    }
+
+    return $db->getAllAssoc();
+}
+
+function readInstallSQLFile($path)
+{
+    $contents = file_get_contents($path);
+
+    if ($contents === false)
+    {
+        die('Failed to read ' . $path . '.');
+    }
+
+    return $contents;
+}
+
+function MySQLQueryMultiple($SQLData, $delimiter = ';')
+{
+    $SQLStatments = explode($delimiter, $SQLData);
+
+    foreach ($SQLStatments as $SQL)
+    {
+        $SQL = trim($SQL);
+
+        if (empty($SQL))
+        {
+            continue;
+        }
+
+        MySQLQuery($SQL);
+    }
+}
+
+function initializeOptionalComponents()
+{
+    global $optionalComponents;
+
+    //Detect which components are installed and which ones are not
+    include_once(LEGACY_ROOT . '/modules/install/OptionalComponents.php');
+
+    foreach ($optionalComponents as $index => $data)
+    {
+        if (isset($data['detectCode']))
+        {
+            $optionalComponents[$index]['componentExists'] = eval($data['detectCode']);
+        }
+        else
+        {
+            $optionalComponents[$index]['componentExists'] = false;
+        }
+    }
+}
+
+?>

@@ -1,0 +1,241 @@
+/* ============================================================
+   A&L TALENT — Base / Reset
+   ============================================================ */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--ael-font);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--ael-text);
+  background: var(--ael-white);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img, video {
+  max-width: 100%;
+  display: block;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+ul, ol {
+  list-style: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font: inherit;
+}
+
+input, select, textarea {
+  font: inherit;
+}
+
+/* ─── Acessibilidade ─────────────────────────────────────── */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ─── Container ─────────────────────────────────────────── */
+.container {
+  width: 100%;
+  max-width: var(--ael-container);
+  margin-inline: auto;
+  padding-inline: var(--ael-space-xl);
+}
+
+.container-sm {
+  width: 100%;
+  max-width: var(--ael-container-sm);
+  margin-inline: auto;
+  padding-inline: var(--ael-space-xl);
+}
+
+/* ─── Tipografia ─────────────────────────────────────────── */
+h1, h2, h3, h4, h5 {
+  font-family: var(--ael-font);
+  color: var(--ael-ink);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 800;
+}
+
+h1 { font-size: clamp(2.25rem, 5vw, 4rem); }
+h2 { font-size: clamp(1.75rem, 3.5vw, 2.75rem); }
+h3 { font-size: clamp(1.125rem, 2.5vw, 1.5rem); font-weight: 700; }
+h4 { font-size: 1.125rem; font-weight: 700; }
+
+p { line-height: 1.7; }
+
+.lead {
+  font-size: 1.125rem;
+  color: var(--ael-muted);
+  line-height: 1.7;
+}
+
+/* ─── Eyebrow label (estilo AEL) ──────────────────────────── */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ael-green-base);
+  margin-bottom: var(--ael-space-md);
+}
+
+.eyebrow::before {
+  content: '';
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--ael-green-accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.eyebrow-light {
+  color: var(--ael-green-accent);
+}
+
+/* ─── Seções ─────────────────────────────────────────────── */
+.section {
+  padding-block: var(--ael-space-5xl);
+}
+
+.section-sm {
+  padding-block: var(--ael-space-4xl);
+}
+
+.section-dark {
+  background: var(--ael-dark-surface);
+  color: var(--ael-dark-text);
+}
+
+.section-dark h1,
+.section-dark h2,
+.section-dark h3 {
+  color: var(--ael-white);
+}
+
+.section-dark .eyebrow {
+  color: var(--ael-green-accent);
+}
+
+.section-alt {
+  background: var(--ael-surface);
+}
+
+.section-header {
+  margin-bottom: var(--ael-space-3xl);
+}
+
+.section-header-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--ael-space-xl);
+  margin-bottom: var(--ael-space-3xl);
+}
+
+/* ─── Skip link ──────────────────────────────────────────── */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  background: var(--ael-green-base);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: var(--ael-radius-md);
+  font-weight: 600;
+  z-index: 9999;
+  transition: top var(--ael-duration-fast);
+}
+
+.skip-link:focus {
+  top: 1rem;
+}
+
+/* ─── Page loader ────────────────────────────────────────── */
+.page-loader {
+  min-height: 40vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--ael-line);
+  border-top-color: var(--ael-green-base);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ─── Animações de entrada ───────────────────────────────── */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(26px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-up {
+  animation: fadeUp var(--ael-duration-slow) var(--ael-ease-out) both;
+}
+
+.animate-up-delay-1 { animation-delay: 80ms; }
+.animate-up-delay-2 { animation-delay: 160ms; }
+.animate-up-delay-3 { animation-delay: 240ms; }
+.animate-up-delay-4 { animation-delay: 320ms; }
+
+/* ─── Responsividade ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  .container, .container-sm {
+    padding-inline: var(--ael-space-lg);
+  }
+
+  .section {
+    padding-block: var(--ael-space-4xl);
+  }
+
+  .section-header-grid {
+    grid-template-columns: 1fr;
+  }
+}

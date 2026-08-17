@@ -1,0 +1,17 @@
+:root {
+  --ael-green-950: #073f31;
+  --ael-green-900: #0a4a39;
+  --ael-green-800: #0b5a43;
+  --ael-green-700: #0d6a4e;
+  --ael-green-100: #e8f2ee;
+  --ael-ink: #0f1713;
+  --ael-text: #4e5b55;
+  --ael-line: #dfe6e2;
+  --ael-surface: #f4f6f5;
+  --ael-white: #ffffff;
+  --ael-shadow: 0 24px 60px rgba(7, 63, 49, 0.12);
+  --ael-radius-sm: 4px;
+  --ael-radius-md: 8px;
+  --ael-radius-lg: 16px;
+  --ael-container: 1180px;
+}

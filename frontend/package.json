@@ -1,0 +1,26 @@
+{
+  "name": "ael-talent-portal",
+  "version": "1.0.0",
+  "description": "Portal de Carreiras A&L Engenharia — Vite + Node.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "server": "node server/index.js",
+    "dev:all": "concurrently \"npm run server\" \"npm run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4",
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "express-rate-limit": "^8.6.2",
+    "multer": "^2.2.0",
+    "mysql2": "^3.9.2"
+  }
+}

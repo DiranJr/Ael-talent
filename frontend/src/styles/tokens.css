@@ -1,0 +1,69 @@
+/* ============================================================
+   A&L TALENT — Design Tokens
+   Extraídos do site institucional aelengenharia.com.br
+   ============================================================ */
+:root {
+  /* ─── Cores primárias A&L ──────────────────────────────── */
+  --ael-green-dark:    #00301E;   /* escuro profundo — fundos hero */
+  --ael-green-base:    #005B3A;   /* verde institucional principal */
+  --ael-green-mid:     #006B45;   /* hover, bordas ativas         */
+  --ael-green-light:   #007A50;   /* variante mais clara          */
+  --ael-green-accent:  #00E676;   /* verde lima — neon accent      */
+  --ael-green-muted:   #1a3d2e;   /* fundos de seção escura       */
+
+  /* ─── Neutros ──────────────────────────────────────────── */
+  --ael-ink:           #0f1a14;   /* texto sobre fundo claro      */
+  --ael-text:          #24332c;   /* corpo de texto principal escuro e nítido */
+  --ael-muted:         #475850;   /* texto secundário com alto contraste */
+  --ael-line:          #d4ddd8;   /* bordas e divisores           */
+  --ael-surface:       #f2f5f3;   /* fundo de seção clara         */
+  --ael-surface-alt:   #e8efeb;   /* fundo de card sobre claro    */
+  --ael-white:         #ffffff;
+
+  /* ─── Superfícies escuras ──────────────────────────────── */
+  --ael-dark-surface:  #071812;   /* fundo hero / header          */
+  --ael-dark-card:     #0d2318;   /* cards sobre fundo escuro     */
+  --ael-dark-border:   #1d3d2c;   /* bordas sobre fundo escuro    */
+  --ael-dark-text:     #ffffff;
+  --ael-dark-muted:    rgba(255, 255, 255, 0.85); /* texto secundário nítido */
+
+  /* ─── Tipografia ────────────────────────────────────────── */
+  --ael-font:          'Inter', system-ui, sans-serif;
+  --ael-font-mono:     'JetBrains Mono', monospace;
+
+  /* ─── Espaçamentos ──────────────────────────────────────── */
+  --ael-space-xs:      0.25rem;
+  --ael-space-sm:      0.5rem;
+  --ael-space-md:      1rem;
+  --ael-space-lg:      1.5rem;
+  --ael-space-xl:      2rem;
+  --ael-space-2xl:     3rem;
+  --ael-space-3xl:     4rem;
+  --ael-space-4xl:     6rem;
+  --ael-space-5xl:     8rem;
+
+  /* ─── Layout ────────────────────────────────────────────── */
+  --ael-container:     1180px;
+  --ael-container-sm:  840px;
+  --ael-header-h:      68px;
+
+  /* ─── Raios ─────────────────────────────────────────────── */
+  --ael-radius-xs:     2px;
+  --ael-radius-sm:     4px;
+  --ael-radius-md:     8px;
+  --ael-radius-lg:     12px;
+  --ael-radius-xl:     20px;
+  --ael-radius-full:   9999px;
+
+  /* ─── Sombras ───────────────────────────────────────────── */
+  --ael-shadow-sm:     0 1px 3px rgba(0,48,30,0.10), 0 1px 2px rgba(0,48,30,0.06);
+  --ael-shadow-md:     0 4px 16px rgba(0,48,30,0.12), 0 2px 6px rgba(0,48,30,0.08);
+  --ael-shadow-lg:     0 12px 40px rgba(0,48,30,0.14), 0 4px 12px rgba(0,48,30,0.10);
+
+  /* ─── Transições ────────────────────────────────────────── */
+  --ael-ease:          cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ael-ease-out:      cubic-bezier(0.0, 0.0, 0.2, 1.0);
+  --ael-duration-fast: 150ms;
+  --ael-duration-base: 240ms;
+  --ael-duration-slow: 400ms;
+}

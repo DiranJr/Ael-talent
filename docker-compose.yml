@@ -1,0 +1,80 @@
+services:
+
+  # ─── Web / PHP (Apache + PHP 8.2) ────────────────────────────────────────────
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.php
+    container_name: ael_web
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./opencats:/var/www/html
+      - ./custom:/var/www/html/ael_custom
+      - ./branding:/var/www/html/ael_branding
+      - uploads:/var/www/html/upload
+      - attachments:/var/www/html/attachments
+    environment:
+      - DB_HOST=db
+      - DB_NAME=${DB_NAME:-cats}
+      - DB_USER=${DB_USER:-ael_dev}
+      - DB_PASS=${DB_PASS:-ael_dev_2024}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - ael_net
+
+  # ─── MariaDB ──────────────────────────────────────────────────────────────────
+  db:
+    image: mariadb:10.11
+    container_name: ael_db
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS:-root_ael_2024}
+      - MYSQL_DATABASE=${DB_NAME:-cats}
+      - MYSQL_USER=${DB_USER:-ael_dev}
+      - MYSQL_PASSWORD=${DB_PASS:-ael_dev_2024}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./opencats/test/data:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--su-mysql", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - ael_net
+
+  # ─── phpMyAdmin ───────────────────────────────────────────────────────────────
+  phpmyadmin:
+    image: phpmyadmin:latest
+    container_name: ael_phpmyadmin
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=db
+      - PMA_USER=${DB_USER:-ael_dev}
+      - PMA_PASSWORD=${DB_PASS:-ael_dev_2024}
+      - PMA_ARBITRARY=1
+    depends_on:
+      - db
+    networks:
+      - ael_net
+
+volumes:
+  db_data:
+    driver: local
+  uploads:
+    driver: local
+  attachments:
+    driver: local
+
+networks:
+  ael_net:
+    driver: bridge
