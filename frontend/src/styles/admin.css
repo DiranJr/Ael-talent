@@ -455,6 +455,104 @@
   border-color: var(--ael-green-base);
 }
 
+/* ─── BOTÕES DE ÍCONE & WHATSAPP ─────────────────────────── */
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--ael-radius-sm);
+  border: 1px solid var(--ael-line);
+  background: #ffffff;
+  color: var(--ael-ink);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--ael-duration-fast);
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.btn-icon:hover {
+  background: rgba(0, 91, 58, 0.08);
+  border-color: var(--ael-green-base);
+  color: var(--ael-green-base);
+}
+
+.btn-icon.whatsapp {
+  color: #25D366;
+  border-color: rgba(37, 211, 102, 0.3);
+  background: rgba(37, 211, 102, 0.05);
+}
+
+.btn-icon.whatsapp:hover {
+  background: #25D366;
+  color: #ffffff;
+  border-color: #25D366;
+}
+
+/* ─── MODAIS DO PAINEL RH ────────────────────────────────── */
+.admin-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.admin-modal {
+  background: #ffffff;
+  border-radius: var(--ael-radius-lg);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--ael-line);
+  animation: adminModalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes adminModalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.admin-modal-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--ael-line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #fafbfb;
+}
+
+.admin-modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  color: var(--ael-ink);
+}
+
+.admin-modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--ael-line);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: #fafbfb;
+}
+
 /* ─── RESPONSIVE ─────────────────────────────────────────── */
 @media (max-width: 1024px) {
   .admin-menu-toggle-btn {
