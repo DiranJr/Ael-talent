@@ -66,8 +66,7 @@ export async function renderAdminLogin(params, appEl) {
               id="login-username"
               type="text"
               class="form-control"
-              placeholder="Ex: admin"
-              value="admin"
+              placeholder="Digite seu usuário"
               required
               autocomplete="username"
             />
