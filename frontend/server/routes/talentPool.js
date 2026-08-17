@@ -6,7 +6,7 @@
 
 import express from 'express'
 import { getDb } from '../db.js'
-import { upload } from '../upload.js'
+import { upload, validateUploadedFile } from '../upload.js'
 import { adminAuth } from './admin.js'
 import {
   hashPassword,
@@ -16,6 +16,7 @@ import {
 } from '../auth/password.js'
 import {
   signCandidateToken,
+  verifyCandidateToken,
   generateResetToken,
   hashResetToken,
 } from '../auth/tokens.js'
@@ -86,7 +87,7 @@ async function getFormattedCandidate(db, candidateId) {
 }
 
 // ============================================================================
-// 1. LOOKUP DE STATUS DE CADASTRO POR E-MAIL (Proteção de PII)
+// 1. LOOKUP DE STATUS DE CADASTRO POR E-MAIL (Proteção de PII & Anti-Enumeração)
 // ============================================================================
 router.get('/lookup', async (req, res) => {
   try {
@@ -95,29 +96,8 @@ router.get('/lookup', async (req, res) => {
       return sendError(res, 'E-mail é obrigatório.', 400)
     }
 
-    const db = await getDb()
-    const cleanEmail = email.trim().toLowerCase()
-
-    const [candRows] = await db.query(
-      'SELECT candidate_id, first_name FROM candidate WHERE (email1 = ? OR email2 = ?) AND is_active = 1 LIMIT 1',
-      [cleanEmail, cleanEmail]
-    )
-
-    if (!candRows.length) {
-      return res.json({ found: false, candidate: null })
-    }
-
-    const c = candRows[0]
-    const [authRows] = await db.query(
-      'SELECT id FROM candidate_auth WHERE candidate_id = ? LIMIT 1',
-      [c.candidate_id]
-    )
-
-    return res.json({
-      found: true,
-      has_password: authRows.length > 0,
-      first_name: c.first_name,
-    })
+    // Resposta segura e genérica sem expor se o e-mail existe nem PII (primeiro nome, senha, etc.)
+    return res.json({ status: 'ok' })
   } catch (err) {
     console.error('Erro no lookup do candidato:', err)
     return sendError(res, 'Erro ao verificar e-mail.', 500)
@@ -154,38 +134,13 @@ router.post('/login', authLimiter, async (req, res) => {
       [c.candidate_id]
     )
 
-    // Primeiro acesso (sem senha configurada)
-    if (!authRows.length) {
-      if (!password?.trim()) {
-        return res.json({
-          first_access: true,
-          message: 'Primeiro acesso detectado. Crie uma senha para acessar seu perfil com segurança.'
-        })
-      } else {
-        const policyCheck = validatePasswordPolicy(password.trim())
-        if (!policyCheck.valid) {
-          return sendError(res, policyCheck.error, 400)
-        }
-
-        const newHash = hashPassword(password.trim())
-        await db.query(
-          `INSERT INTO candidate_auth (candidate_id, password_hash, failed_attempts, last_login, created_at, updated_at)
-           VALUES (?, ?, 0, NOW(), NOW(), NOW())`,
-          [c.candidate_id, newHash]
-        )
-
-        const token = signCandidateToken({
-          candidate_id: c.candidate_id,
-          email: c.email1,
-          name: `${c.first_name} ${c.last_name}`.trim()
-        })
-
-        const candidate = await getFormattedCandidate(db, c.candidate_id)
-        return sendSuccess(res, {
-          token,
-          candidate,
-        }, `Bem-vindo(a), ${c.first_name}!`)
-      }
+    // Primeiro acesso (sem senha configurada no candidate_auth)
+    // NÃO cria hash automaticamente aqui para evitar sequestro de conta
+    if (!authRows.length || !authRows[0].password_hash) {
+      return res.json({
+        first_access: true,
+        message: 'Primeiro acesso detectado. Solicite a ativação da sua conta.'
+      })
     }
 
     const auth = authRows[0]
@@ -284,27 +239,23 @@ router.post('/set-password', authLimiter, async (req, res) => {
     const authHeader = req.headers.authorization
     let isAuthorized = false
 
-    // Se possui token válido do candidato
+    // 1. Se possui Bearer Token válido do próprio candidato
     if (authHeader?.startsWith('Bearer ')) {
       const token = authHeader.split(' ')[1]
-      const payload = signCandidateToken(token)
+      const payload = verifyCandidateToken(token)
       if (payload?.candidate_id === c.candidate_id) {
         isAuthorized = true
       }
     }
 
-    // Se não está autenticado por token mas possui senha configurada, exige senha atual
-    if (!isAuthorized && authRows.length > 0) {
+    // 2. Se não está autenticado por token mas possui senha configurada, exige senha atual
+    if (!isAuthorized && authRows.length > 0 && authRows[0].password_hash) {
       if (current_password?.trim() && verifyPassword(current_password, authRows[0].password_hash)) {
         isAuthorized = true
       }
     }
 
-    // Primeiro acesso
-    if (!authRows.length) {
-      isAuthorized = true
-    }
-
+    // Se não está autorizado, bloqueia com 401
     if (!isAuthorized) {
       return sendError(res, 'Para alterar a senha, informe sua senha atual ou acesse autenticado.', 401)
     }
@@ -668,33 +619,26 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
       }
     }
 
-    // 3. CANDIDATE_AUTH (Grava senha exclusivamente na tabela candidate_auth)
-    if (password && password.trim().length >= 8) {
+    // Validação de arquivo de upload enviado
+    if (req.file) {
+      const validation = await validateUploadedFile(req.file.path, req.file.originalname)
+      if (!validation.valid) {
+        await conn.rollback()
+        return sendError(res, validation.error || 'Arquivo de currículo inválido.', 400)
+      }
+    }
+
+    // 3. CANDIDATE_AUTH (Grava senha exclusivamente no cadastro de NOVO candidato)
+    // Bloqueia qualquer alteração de senha de candidatos pré-existentes via /register
+    if (isNew && password && password.trim().length >= 8) {
       const pwdPolicy = validatePasswordPolicy(password.trim())
       if (pwdPolicy.valid) {
         const newHash = hashPassword(password.trim())
-        const [authCheck] = await conn.query(
-          'SELECT id FROM candidate_auth WHERE candidate_id = ?',
-          [candidateId]
+        await conn.query(
+          `INSERT INTO candidate_auth (candidate_id, password_hash, failed_attempts, created_at, updated_at)
+           VALUES (?, ?, 0, NOW(), NOW())`,
+          [candidateId, newHash]
         )
-
-        if (authCheck.length > 0) {
-          await conn.query(
-            `UPDATE candidate_auth SET
-              password_hash = ?,
-              password_changed_at = NOW(),
-              failed_attempts = 0,
-              locked_until = NULL
-             WHERE candidate_id = ?`,
-            [newHash, candidateId]
-          )
-        } else {
-          await conn.query(
-            `INSERT INTO candidate_auth (candidate_id, password_hash, failed_attempts, created_at, updated_at)
-             VALUES (?, ?, 0, NOW(), NOW())`,
-            [candidateId, newHash]
-          )
-        }
       }
     }
 
@@ -781,14 +725,92 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
 })
 
 // ============================================================================
-// 8. LISTAGEM DO BANCO DE TALENTOS PARA O RH (Protegido com adminAuth)
+// 8. LISTAGEM DO BANCO DE TALENTOS PARA O RH (Protegido com adminAuth & Filtros SQL)
 // ============================================================================
 router.get('/candidates', adminAuth, async (req, res) => {
   try {
     const db = await getDb()
     const { search, area, experience, education, state, city } = req.query
 
-    let sql = `
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50))
+    const offset = (page - 1) * limit
+
+    const whereClauses = ['c.is_active = 1']
+    const params = []
+
+    if (search?.trim()) {
+      const term = `%${search.trim()}%`
+      whereClauses.push(`(
+        CONCAT(c.first_name, ' ', c.last_name) LIKE ?
+        OR c.email1 LIKE ?
+        OR c.phone_cell LIKE ?
+        OR c.city LIKE ?
+        OR c.key_skills LIKE ?
+        OR c.notes LIKE ?
+        OR c.current_employer LIKE ?
+        OR EXISTS (
+          SELECT 1 FROM extra_field ef_search
+          WHERE ef_search.data_item_id = c.candidate_id
+            AND ef_search.data_item_type = 100
+            AND ef_search.value LIKE ?
+        )
+      )`)
+      params.push(term, term, term, term, term, term, term, term)
+    }
+
+    if (city?.trim()) {
+      whereClauses.push(`c.city LIKE ?`)
+      params.push(`%${city.trim()}%`)
+    }
+
+    if (state?.trim()) {
+      whereClauses.push(`c.state = ?`)
+      params.push(state.trim().toUpperCase())
+    }
+
+    if (area?.trim()) {
+      whereClauses.push(`EXISTS (
+        SELECT 1 FROM extra_field ef_area
+        WHERE ef_area.data_item_id = c.candidate_id
+          AND ef_area.data_item_type = 100
+          AND ef_area.field_name = 'Area de Interesse'
+          AND ef_area.value LIKE ?
+      )`)
+      params.push(`%${area.trim()}%`)
+    }
+
+    if (experience?.trim()) {
+      whereClauses.push(`EXISTS (
+        SELECT 1 FROM extra_field ef_exp
+        WHERE ef_exp.data_item_id = c.candidate_id
+          AND ef_exp.data_item_type = 100
+          AND ef_exp.field_name = 'Tempo de Experiencia'
+          AND ef_exp.value LIKE ?
+      )`)
+      params.push(`%${experience.trim()}%`)
+    }
+
+    if (education?.trim()) {
+      whereClauses.push(`EXISTS (
+        SELECT 1 FROM extra_field ef_edu
+        WHERE ef_edu.data_item_id = c.candidate_id
+          AND ef_edu.data_item_type = 100
+          AND ef_edu.field_name = 'Escolaridade'
+          AND ef_edu.value LIKE ?
+      )`)
+      params.push(`%${education.trim()}%`)
+    }
+
+    const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : ''
+
+    // 1. Contagem total com todos os filtros aplicados
+    const countSql = `SELECT COUNT(DISTINCT c.candidate_id) as total FROM candidate c ${whereSql}`
+    const [countResult] = await db.query(countSql, params)
+    const total = countResult[0]?.total || 0
+
+    // 2. Consulta paginada com ordenação
+    const selectSql = `
       SELECT
         c.candidate_id,
         c.first_name,
@@ -826,37 +848,12 @@ router.get('/candidates', adminAuth, async (req, res) => {
         WHERE data_item_type = 100 AND resume = 1
         GROUP BY data_item_id
       ) a ON a.data_item_id = c.candidate_id
-      WHERE c.is_active = 1
+      ${whereSql}
+      ORDER BY c.date_created DESC
+      LIMIT ? OFFSET ?
     `
-    const params = []
 
-    if (search) {
-      const term = `%${search.trim()}%`
-      sql += ` AND (
-        CONCAT(c.first_name, ' ', c.last_name) LIKE ?
-        OR c.email1 LIKE ?
-        OR c.phone_cell LIKE ?
-        OR c.city LIKE ?
-        OR c.key_skills LIKE ?
-        OR c.notes LIKE ?
-        OR c.current_employer LIKE ?
-      )`
-      params.push(term, term, term, term, term, term, term)
-    }
-
-    if (city) {
-      sql += ` AND c.city LIKE ?`
-      params.push(`%${city.trim()}%`)
-    }
-
-    if (state) {
-      sql += ` AND c.state = ?`
-      params.push(state.trim().toUpperCase())
-    }
-
-    sql += ` ORDER BY c.date_created DESC LIMIT 200`
-
-    const [candidates] = await db.query(sql, params)
+    const [candidates] = await db.query(selectSql, [...params, limit, offset])
 
     const candidateIds = candidates.map(c => c.candidate_id)
     let extraFieldsByCand = {}
@@ -928,21 +925,12 @@ router.get('/candidates', adminAuth, async (req, res) => {
       }
     })
 
-    let filtered = formatted
-    if (area) {
-      filtered = filtered.filter(c => c.interest_area && c.interest_area.toLowerCase().includes(area.toLowerCase()))
-    }
-    if (experience) {
-      filtered = filtered.filter(c => c.experience_years && c.experience_years.toLowerCase().includes(experience.toLowerCase()))
-    }
-    if (education) {
-      filtered = filtered.filter(c => c.education_level && c.education_level.toLowerCase().includes(education.toLowerCase()))
-    }
-
     return res.json({
       success: true,
-      total: filtered.length,
-      candidates: filtered,
+      page,
+      limit,
+      total,
+      candidates: formatted,
     })
   } catch (err) {
     console.error('Erro ao consultar Banco de Talentos:', err)

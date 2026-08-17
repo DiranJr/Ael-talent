@@ -5,6 +5,21 @@
 import mysql from 'mysql2/promise'
 import 'dotenv/config'
 
+const isProd = process.env.NODE_ENV === 'production'
+
+if (isProd) {
+  const missing = []
+  if (!process.env.DB_HOST) missing.push('DB_HOST')
+  if (!process.env.DB_NAME) missing.push('DB_NAME')
+  if (!process.env.DB_USER) missing.push('DB_USER')
+  if (!process.env.DB_PASS) missing.push('DB_PASS')
+
+  if (missing.length > 0) {
+    console.error(`❌ CRÍTICO: Variáveis de banco obrigatórias ausentes em produção: ${missing.join(', ')}`)
+    process.exit(1)
+  }
+}
+
 let pool = null
 
 export async function getDb() {
