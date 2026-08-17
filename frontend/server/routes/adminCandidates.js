@@ -22,23 +22,29 @@ export async function adminGetCandidatesHandler(req, res) {
   try {
     const db = await getDb()
     const { joborder_id, status, recruiter, search = '' } = req.query
+    const user = req.adminUser || {}
+    const isAdmin = (user.access_level || 0) >= 400
 
     let where = 'WHERE 1=1'
     const params = []
 
+    // Regra: se não for admin, só pode ver candidatos de vagas designadas para ele OU vagas sem recrutador designado
+    if (!isAdmin && user.user_id) {
+      where += ' AND (jo.recruiter = ? OR jo.recruiter IS NULL OR jo.recruiter = 0)'
+      params.push(user.user_id)
+    } else if (recruiter) {
+      where += ' AND jo.recruiter = ?'
+      params.push(parseInt(recruiter, 10))
+    }
+
     if (joborder_id) {
       where += ' AND cj.joborder_id = ?'
-      params.push(parseInt(joborder_id))
+      params.push(parseInt(joborder_id, 10))
     }
 
     if (status) {
       where += ' AND cj.status = ?'
-      params.push(parseInt(status))
-    }
-
-    if (recruiter) {
-      where += ' AND jo.recruiter = ?'
-      params.push(parseInt(recruiter))
+      params.push(parseInt(status, 10))
     }
 
     if (search) {

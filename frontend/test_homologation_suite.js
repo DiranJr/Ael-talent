@@ -140,13 +140,35 @@ async function runHomologationSuite() {
     results.push({ test: '1. Banco de Talentos SEM Currículo', status: 'FALHOU', detail: err.message })
   }
 
+function createValidPdfBuffer(title = 'Curriculo do Candidato - A&L Talent') {
+  const contentStream = `BT\n/F1 16 Tf\n50 720 Td\n(${title.replace(/[()]/g, '')}) Tj\nET`
+  const streamLen = Buffer.byteLength(contentStream)
+  const header = '%PDF-1.4\n'
+  const obj1 = '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'
+  const obj2 = '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'
+  const obj3 = '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>\nendobj\n'
+  const obj4 = `4 0 obj\n<< /Length ${streamLen} >>\nstream\n${contentStream}\nendstream\nendobj\n`
+
+  const offset1 = Buffer.byteLength(header)
+  const offset2 = offset1 + Buffer.byteLength(obj1)
+  const offset3 = offset2 + Buffer.byteLength(obj2)
+  const offset4 = offset3 + Buffer.byteLength(obj3)
+  const xrefOffset = offset4 + Buffer.byteLength(obj4)
+
+  const pad = (n) => String(n).padStart(10, '0')
+  const xref = `xref\n0 5\n0000000000 65535 f \n${pad(offset1)} 00000 n \n${pad(offset2)} 00000 n \n${pad(offset3)} 00000 n \n${pad(offset4)} 00000 n \n`
+  const trailer = `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+
+  return Buffer.from(header + obj1 + obj2 + obj3 + obj4 + xref + trailer, 'utf8')
+}
+
   // ──────────────────────────────────────────────────────────────────
   // TESTE 2: Banco de Talentos COM Currículo PDF e DOCX
   // ──────────────────────────────────────────────────────────────────
   console.log('--- TESTE 2: Cadastro no Banco de Talentos COM Currículo PDF e DOCX ---')
   try {
     const email2 = `candidato.compdf.${Date.now()}@ael.dev`
-    const fakePdfBuffer = Buffer.from('%PDF-1.4 Fake PDF Content for Homologation Testing')
+    const fakePdfBuffer = createValidPdfBuffer('Curriculo Renata Silva - Engenharia A&L')
     const { body: pdfBody, contentType: pdfType } = buildMultipartFormData({
       first_name: 'Renata',
       last_name: 'Silva Com PDF',

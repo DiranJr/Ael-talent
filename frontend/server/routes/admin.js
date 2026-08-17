@@ -114,18 +114,34 @@ export async function adminLoginHandler(req, res) {
 export async function adminStatsHandler(req, res) {
   try {
     const db = await getDb()
+    const user = req.adminUser || {}
+    const isAdmin = (user.access_level || 0) >= 400
+
+    let jobScopeWhere = ''
+    let appScopeWhere = ''
+    const jobParams = []
+    const appParams = []
+
+    if (!isAdmin && user.user_id) {
+      jobScopeWhere = ' AND (jo.recruiter = ? OR jo.recruiter IS NULL OR jo.recruiter = 0)'
+      appScopeWhere = ' AND (jo.recruiter = ? OR jo.recruiter IS NULL OR jo.recruiter = 0)'
+      jobParams.push(user.user_id)
+      appParams.push(user.user_id)
+    }
 
     // 1. Total de vagas ativas/publicadas
     const [[{ total_active_jobs }]] = await db.execute(`
       SELECT COUNT(*) AS total_active_jobs
-      FROM joborder
-      WHERE status = 'Active-Share' OR public = 1
-    `)
+      FROM joborder jo
+      WHERE (jo.status = 'Active-Share' OR jo.public = 1) ${jobScopeWhere}
+    `, jobParams)
 
     // 2. Total geral de vagas
     const [[{ total_jobs }]] = await db.execute(`
-      SELECT COUNT(*) AS total_jobs FROM joborder
-    `)
+      SELECT COUNT(*) AS total_jobs
+      FROM joborder jo
+      WHERE 1=1 ${jobScopeWhere}
+    `, jobParams)
 
     // 3. Total de candidatos cadastrados
     const [[{ total_candidates }]] = await db.execute(`
@@ -135,9 +151,10 @@ export async function adminStatsHandler(req, res) {
     // 4. Candidaturas nos últimos 7 dias
     const [[{ recent_applications }]] = await db.execute(`
       SELECT COUNT(*) AS recent_applications
-      FROM candidate_joborder
-      WHERE date_created >= DATE_SUB(NOW(), INTERVAL 7 DAY)
-    `)
+      FROM candidate_joborder cj
+      JOIN joborder jo ON cj.joborder_id = jo.joborder_id
+      WHERE cj.date_created >= DATE_SUB(NOW(), INTERVAL 7 DAY) ${appScopeWhere}
+    `, appParams)
 
     // 5. Últimas 6 candidaturas recebidas
     const [latestApplications] = await db.execute(`
@@ -160,9 +177,10 @@ export async function adminStatsHandler(req, res) {
       JOIN candidate c ON cj.candidate_id = c.candidate_id
       JOIN joborder jo ON cj.joborder_id = jo.joborder_id
       LEFT JOIN attachment att ON att.data_item_id = c.candidate_id AND att.data_item_type = 100 AND att.resume = 1
+      WHERE 1=1 ${appScopeWhere}
       ORDER BY cj.date_created DESC
       LIMIT 6
-    `)
+    `, appParams)
 
     // 6. Vagas com mais candidaturas
     const [topJobs] = await db.execute(`
@@ -177,10 +195,11 @@ export async function adminStatsHandler(req, res) {
       FROM joborder jo
       LEFT JOIN company_department cd ON jo.company_department_id = cd.company_department_id
       LEFT JOIN candidate_joborder cj ON jo.joborder_id = cj.joborder_id
+      WHERE 1=1 ${jobScopeWhere}
       GROUP BY jo.joborder_id
       ORDER BY total_applicants DESC, jo.date_created DESC
       LIMIT 5
-    `)
+    `, jobParams)
 
     return res.json({
       metrics: {

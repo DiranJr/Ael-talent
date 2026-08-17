@@ -149,8 +149,41 @@ async function runRecruiterFeatureTest() {
     detail: `Status: ${jobRes.statusCode}, Vaga ID: ${jobId}, Recrutador Atribuído: ${jobCheck[0]?.recruiter}`
   })
 
-  // 5. Exclusão de usuário e reatribuição de vagas
-  console.log('--- 5. Exclusão de Recrutador pelo Administrador ---')
+  // 5. Tentativa de exclusão de vaga por Recrutador (deve ser bloqueado com 403)
+  console.log('--- 5. Tentativa de Exclusão de Vaga por Recrutador ---')
+  const recruiterDeleteRes = await apiRequest({
+    method: 'DELETE',
+    path: `/api/admin/jobs/${jobId}`,
+    token: paulaToken,
+  })
+
+  const passed5 = recruiterDeleteRes.statusCode === 403
+  results.push({
+    test: '5. Bloqueio de Exclusão de Vaga para Recrutador (403 Forbidden)',
+    status: passed5 ? 'APROVADO' : 'FALHOU',
+    detail: `Status: ${recruiterDeleteRes.statusCode} (Exclusão proibida para recrutador)`
+  })
+
+  // 6. Listagem de Vagas pelo Recrutador (Apenas atribuídas ou gerais)
+  console.log('--- 6. Listagem de Vagas pelo Recrutador ---')
+  const recruiterListRes = await apiRequest({
+    method: 'GET',
+    path: '/api/admin/jobs',
+    token: paulaToken,
+  })
+
+  const recruiterJobs = recruiterListRes.data?.jobs || []
+  // Garante que todas as vagas listadas são da Paula ou não atribuídas
+  const onlyAssignedOrUnassigned = recruiterJobs.every(j => j.recruiter_id === newUserId || !j.recruiter_id)
+  const passed6 = recruiterListRes.statusCode === 200 && recruiterJobs.length > 0 && onlyAssignedOrUnassigned
+  results.push({
+    test: '6. Escopo de Vagas do Recrutador (Apenas atribuídas ou gerais)',
+    status: passed6 ? 'APROVADO' : 'FALHOU',
+    detail: `Status: ${recruiterListRes.statusCode}, Total Vagas Visíveis: ${recruiterJobs.length}, Vagas Isoladas: ${onlyAssignedOrUnassigned}`
+  })
+
+  // 7. Exclusão de usuário e reatribuição de vagas pelo Administrador
+  console.log('--- 7. Exclusão de Recrutador e Vaga pelo Administrador ---')
   const deleteRes = await apiRequest({
     method: 'DELETE',
     path: `/api/admin/users/${newUserId}`,
@@ -159,13 +192,17 @@ async function runRecruiterFeatureTest() {
 
   // Limpa a vaga de teste
   if (jobId) {
-    await db.query('DELETE FROM joborder WHERE joborder_id = ?', [jobId])
+    await apiRequest({
+      method: 'DELETE',
+      path: `/api/admin/jobs/${jobId}`,
+      token: ADMIN_TOKEN,
+    })
   }
 
-  const passed5 = deleteRes.statusCode === 200
+  const passed7 = deleteRes.statusCode === 200
   results.push({
-    test: '5. Exclusão de Recrutador e Limpeza',
-    status: passed5 ? 'APROVADO' : 'FALHOU',
+    test: '7. Exclusão de Recrutador e Limpeza pelo Admin',
+    status: passed7 ? 'APROVADO' : 'FALHOU',
     detail: `Status: ${deleteRes.statusCode}`
   })
 
