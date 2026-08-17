@@ -403,17 +403,22 @@ function renderCandidateDetailHtml(c) {
   const acts = c.activities || []
   const atts = c.attachments || []
   const mainAttachmentId = c.attachment_id || atts[0]?.attachment_id
+  const skills = Array.isArray(c.key_skills)
+    ? c.key_skills
+    : (typeof c.key_skills === 'string' && c.key_skills.trim()
+        ? c.key_skills.split(',').map(s => s.trim()).filter(Boolean)
+        : [])
 
   return `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
       <div>
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">E-mail & Telefone</span>
-        <strong>${escHtml(c.email1)}</strong><br>
-        <span>${escHtml(c.phone_cell || 'Sem telefone')}</span>
+        <strong>${escHtml(c.email1 || c.email)}</strong><br>
+        <span>${escHtml(c.phone_cell || c.phone || 'Sem telefone')}</span>
       </div>
       <div>
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">Localização & Disponibilidade</span>
-        <strong>${escHtml(c.city)} - ${escHtml(c.state)}</strong><br>
+        <strong>${escHtml(c.city || 'Não informada')} - ${escHtml(c.state || 'PA')}</strong><br>
         <span>Mudança: ${c.can_relocate ? 'Sim' : 'Não'} · Viagens: ${escHtml(ex['Disponibilidade para Viagens'] || 'Não informado')}</span>
       </div>
     </div>
@@ -453,13 +458,13 @@ function renderCandidateDetailHtml(c) {
       </div>
     ` : ''}
 
-    ${c.key_skills ? `
+    ${skills.length ? `
       <div style="margin-bottom: 1.25rem;">
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem; margin-bottom: 0.35rem;">Competências Técnicas</span>
         <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
-          ${c.key_skills.split(',').map(s => `
+          ${skills.map(s => `
             <span style="background: rgba(0,91,58,0.1); color: var(--ael-green-dark); font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 600;">
-              ${escHtml(s.trim())}
+              ${escHtml(String(s).trim())}
             </span>
           `).join('')}
         </div>
