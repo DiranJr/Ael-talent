@@ -39,6 +39,27 @@ Este documento consolida os testes de homologação operacional de ponta a ponta
 
 ---
 
-## 4. Conclusão da Homologação
+---
 
-O sistema **A&L Talent + OpenCATS** encontra-se **totalmente homologado e validado operacionalmente**, habilitando a equipe de Recursos Humanos a conduzir todo o ciclo de atração, seleção e admissão sem dependência técnica diária.
+## 4. Correções Pós-Auditoria de Segurança
+
+Após auditoria técnica aprofundada, as seguintes vulnerabilidades e inconsistências foram integralmente corrigidas e validadas por suítes de testes automatizados:
+
+1. **Rate Limit Bypass**: Header `x-test-bypass` desativado globalmente para qualquer ambiente fora de `NODE_ENV === 'test'`. Em produção, staging e desenvolvimento, tentativas de contornar limitadores de taxa por cabeçalho são sumariamente ignoradas.
+2. **Primeiro Acesso Protegido contra Account Takeover**: Candidatos legados ou importados sem registro em `candidate_auth` não podem ter suas senhas definidas por terceiros. O endpoint `/login` responde `{ first_access: true }` sem gravar credenciais e `/set-password` exige fluxo seguro de ativação por token criptográfico de uso único.
+3. **Correção em `/set-password`**: Substituição da chamada indevida de assinatura por `verifyCandidateToken(token)` e validação rigorosa de Bearer tokens.
+4. **Bloqueio de Redefinição via `/register`**: O formulário de cadastro público `/register` foi bloqueado para não alterar nem sobrescrever credenciais de candidatos já existentes na base.
+5. **Tokens HMAC Timing-Safe**: Implementação de comparação de assinaturas em tempo constante (`crypto.timingSafeEqual`) para tokens de candidatos e administradores, além de validação estrita contra tokens malformados, truncados ou sem identificadores.
+6. **Lookup Seguro e Anti-Enumeração**: Rota `/lookup` padronizada para resposta neutra `{ status: "ok" }`, eliminando enumeração de e-mails e vazamento de PII (`first_name`, `candidate_id`, `has_password`).
+7. **Validação de Conteúdo Real em Uploads (Magic Bytes)**: Validação binária em camadas verificando assinaturas reais `%PDF-` para PDFs, pacotes ZIP com estrutura OpenXML para DOCX e OLE Compound para DOC, com descarte e exclusão imediata de executáveis disfarçados ou arquivos corrompidos.
+8. **Filtros SQL Nativos e Paginação**: Migração completa dos filtros de área, escolaridade, experiência, cidade, estado e busca textual para consultas SQL nativas (`WHERE` e `EXISTS` em `extra_field`), garantindo que candidatos após a 200ª posição sejam retornados com precisão e paginação escalável.
+9. **Endurecimento de Configuração em Produção**: Validação obrigatória na inicialização em produção de `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` e bloqueio estrito de secrets de sessão fracos (< 32 caracteres) ou padrões.
+
+---
+
+## 5. Conclusão da Homologação
+
+**Status:** **HOMOLOGADO PARA PREPARAR DEPLOY**  
+**Data da Última Validação Técnica:** 17 de Agosto de 2026  
+**Condições:** Todas as suítes de testes de segurança, auditoria, homologação operacional e funcionalidades do recrutador executadas com 100% de aprovação no ambiente integrado A&L Talent + MariaDB OpenCATS.
+
