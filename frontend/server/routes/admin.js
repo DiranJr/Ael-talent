@@ -13,11 +13,18 @@ import { sendSuccess, sendError } from '../helpers.js'
  */
 export function adminAuth(req, res, next) {
   const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  let token = null
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1]
+  } else if (req.query?.token) {
+    token = req.query.token
+  }
+
+  if (!token) {
     return sendError(res, 'Acesso restrito ao RH. Faça login.', 401)
   }
 
-  const token = authHeader.split(' ')[1]
   const user = verifyAdminToken(token)
 
   if (!user) {

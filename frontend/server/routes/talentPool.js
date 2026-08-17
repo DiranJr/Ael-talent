@@ -979,11 +979,35 @@ router.post('/candidates/:id/assign-job', adminAuth, async (req, res) => {
       [candidateId, joborder_id]
     )
 
-    if (check.length > 0) {
-      return sendError(res, 'Este candidato já está inscrito ou associado a esta vaga.', 409)
-    }
-
     const initialStatus = parseInt(status) || 100
+    const [jobInfo] = await db.query('SELECT title FROM joborder WHERE joborder_id = ?', [joborder_id])
+    const jobTitle = jobInfo[0]?.title || `#${joborder_id}`
+
+    if (check.length > 0) {
+      const existing = check[0]
+      await db.query(
+        'UPDATE candidate_joborder SET status = ?, date_modified = NOW() WHERE candidate_joborder_id = ?',
+        [initialStatus, existing.candidate_joborder_id]
+      )
+
+      await db.query(
+        `INSERT INTO candidate_joborder_status_history (
+          candidate_id, joborder_id, date, status_from, status_to
+        ) VALUES (?, ?, NOW(), 0, ?)`,
+        [candidateId, joborder_id, initialStatus]
+      )
+
+      await db.query(
+        `INSERT INTO activity (
+          data_item_id, data_item_type, type, notes, date_created, entered_by
+        ) VALUES (?, 100, 800, ?, NOW(), 1)`,
+        [candidateId, `Etapa do candidato atualizada para status ${initialStatus} na vaga "${jobTitle}".`]
+      )
+
+      return sendSuccess(res, {
+        candidate_joborder_id: existing.candidate_joborder_id,
+      }, `Candidato atualizado com sucesso na vaga "${jobTitle}"!`, 200)
+    }
 
     const [insRes] = await db.query(
       `INSERT INTO candidate_joborder (
@@ -998,9 +1022,6 @@ router.post('/candidates/:id/assign-job', adminAuth, async (req, res) => {
       ) VALUES (?, ?, NOW(), 0, ?)`,
       [candidateId, joborder_id, initialStatus]
     )
-
-    const [jobInfo] = await db.query('SELECT title FROM joborder WHERE joborder_id = ?', [joborder_id])
-    const jobTitle = jobInfo[0]?.title || `#${joborder_id}`
 
     await db.query(
       `INSERT INTO activity (

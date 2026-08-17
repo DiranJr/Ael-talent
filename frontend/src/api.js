@@ -168,6 +168,13 @@ export async function adminGetCandidateDetail(id) {
   return apiFetch(`/admin/candidates/${id}`)
 }
 
+/** Retorna a URL segura para download ou visualização de currículo/anexo */
+export function getAttachmentDownloadUrl(id) {
+  if (!id) return ''
+  const token = getAdminToken()
+  return `/api/admin/attachments/${id}/download${token ? `?token=${encodeURIComponent(token)}` : ''}`
+}
+
 /** Alterar status do candidato no processo seletivo */
 export async function adminUpdateCandidateStatus(candidateId, jobId, { status, note }) {
   return apiFetch(`/admin/candidates/${candidateId}/jobs/${jobId}/status`, {

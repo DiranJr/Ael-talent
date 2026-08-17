@@ -9,6 +9,7 @@ import {
   adminAssignCandidateToJob,
   adminGetJobs,
   adminGetDepartments,
+  getAttachmentDownloadUrl,
 } from '../../api.js'
 import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
 import { navigate } from '../../router.js'
@@ -256,7 +257,7 @@ function renderCandidatesRows(candidates) {
               </a>` : ''}
 
             ${c.attachment_id ? `
-              <a href="/api/admin/attachments/${c.attachment_id}/download" target="_blank" class="btn-icon" title="Baixar Currículo">
+              <a href="${getAttachmentDownloadUrl(c.attachment_id)}" target="_blank" rel="noopener" class="btn-icon" title="Baixar Currículo">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
               </a>` : ''}
 
@@ -374,6 +375,8 @@ function renderCandidateDetailHtml(c) {
   const ex = c.extra_fields || {}
   const apps = c.applications || []
   const acts = c.activities || []
+  const atts = c.attachments || []
+  const mainAttachmentId = c.attachment_id || atts[0]?.attachment_id
 
   return `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
@@ -388,6 +391,19 @@ function renderCandidateDetailHtml(c) {
         <span>Mudança: ${c.can_relocate ? 'Sim' : 'Não'} · Viagens: ${escHtml(ex['Disponibilidade para Viagens'] || 'Não informado')}</span>
       </div>
     </div>
+
+    ${mainAttachmentId ? `
+      <div style="margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: center; background: rgba(0, 91, 58, 0.06); padding: 0.75rem 1rem; border-radius: var(--ael-radius-md); border: 1px solid rgba(0, 91, 58, 0.15);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--ael-green-base); flex-shrink: 0;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 0.875rem; color: var(--ael-ink);">Currículo Anexado</div>
+          <div style="font-size: 0.75rem; color: var(--ael-muted);">${escHtml(c.original_filename || atts[0]?.original_filename || 'Documento do Candidato')}</div>
+        </div>
+        <a href="${getAttachmentDownloadUrl(mainAttachmentId)}" target="_blank" rel="noopener" class="btn btn-sm btn-primary" style="gap: 0.35rem; font-size: 0.75rem; padding: 0.35rem 0.75rem;">
+          📄 Abrir / Baixar
+        </a>
+      </div>
+    ` : ''}
 
     <div style="background: var(--ael-surface); border-radius: var(--ael-radius-md); padding: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">

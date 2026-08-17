@@ -6,6 +6,7 @@ import {
   adminGetCandidates,
   adminGetJobs,
   adminUpdateCandidateStatus,
+  getAttachmentDownloadUrl,
   getAdminUser,
 } from '../../api.js'
 import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
@@ -130,6 +131,7 @@ function renderCandidatesRows(candidates, currentUser) {
 
   return candidates.map(c => {
     const isMyJob = c.recruiter_id === currentUser?.user_id
+    const downloadUrl = c.attachment_id ? getAttachmentDownloadUrl(c.attachment_id) : null
     return `
       <tr data-id="${c.candidate_id}" data-job-id="${c.joborder_id}">
         <!-- CANDIDATO -->
@@ -170,7 +172,7 @@ function renderCandidatesRows(candidates, currentUser) {
 
         <!-- ETAPA DO PROCESSO COM SELECT RÁPIDO -->
         <td>
-          <select class="form-control status-select" data-candidate-id="${c.candidate_id}" data-job-id="${c.joborder_id}" style="padding: 0.35rem 0.65rem; font-size: 0.8125rem; font-weight: 600; min-width: 150px;">
+          <select class="form-control status-select" data-candidate-id="${c.candidate_id}" data-job-id="${c.joborder_id}" data-current-status="${c.status_code}" style="padding: 0.35rem 0.65rem; font-size: 0.8125rem; font-weight: 600; min-width: 150px;">
             <option value="100" ${c.status_code == 100 ? 'selected' : ''}>Novo / Recebido</option>
             <option value="200" ${c.status_code == 200 ? 'selected' : ''}>Contactado</option>
             <option value="300" ${c.status_code == 300 ? 'selected' : ''}>Em Triagem</option>
@@ -184,15 +186,11 @@ function renderCandidatesRows(candidates, currentUser) {
         <!-- AÇÕES -->
         <td style="text-align: right;">
           <div style="display: inline-flex; gap: 0.5rem; align-items: center;">
-            ${c.attachment_id ? `
-              <a href="/api/admin/attachments/${c.attachment_id}/download" target="_blank" class="admin-action-btn" title="Visualizar / Baixar Currículo">
+            ${downloadUrl ? `
+              <a href="${downloadUrl}" target="_blank" rel="noopener" class="admin-action-btn" title="Visualizar / Baixar Currículo">
                 📄 Currículo
               </a>
             ` : '<span style="font-size: 0.75rem; color: var(--ael-muted);">Sem PDF</span>'}
-
-            <a href="#/talent-pool/register?job_id=${c.joborder_id}" class="btn btn-sm btn-ghost" title="Abrir perfil completo" style="display:none;">
-              Perfil
-            </a>
           </div>
         </td>
       </tr>
@@ -259,16 +257,23 @@ function bindStatusSelects(appEl) {
       const candidateId = select.dataset.candidateId
       const jobId = select.dataset.jobId
       const newStatus = select.value
+      const prevStatus = select.dataset.currentStatus || select.defaultValue
 
       const note = prompt('Deseja adicionar uma observação de triagem para o histórico? (Opcional):', '')
+      if (note === null) {
+        select.value = prevStatus
+        return
+      }
 
       try {
         await adminUpdateCandidateStatus(candidateId, jobId, {
           status: newStatus,
           note: note ? note.trim() : ''
         })
+        select.dataset.currentStatus = newStatus
         showToast({ title: 'Status atualizado!', message: 'A etapa do candidato foi registrada com sua autoria.', type: 'success' })
       } catch (err) {
+        select.value = prevStatus
         showToast({ title: 'Erro ao atualizar', message: err.message, type: 'error' })
       }
     })
