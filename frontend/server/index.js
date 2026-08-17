@@ -69,7 +69,9 @@ app.use(cors({
     return callback(new Error('Origem não permitida pela política de CORS.'))
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-test-bypass'],
+  allowedHeaders: process.env.NODE_ENV === 'test'
+    ? ['Content-Type', 'Authorization', 'x-test-bypass']
+    : ['Content-Type', 'Authorization'],
 }))
 
 app.use(express.json({ limit: '2mb' }))
