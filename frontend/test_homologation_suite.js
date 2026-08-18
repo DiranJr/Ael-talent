@@ -647,9 +647,28 @@ function createValidPdfBuffer(title = 'Curriculo do Candidato - A&L Talent') {
   const allPassed = results.every(r => r.status === 'APROVADO')
   console.log(`\nStatus Geral da Homologação: ${allPassed ? '✅ 100% APROVADO' : '❌ FALHAS ENCONTRADAS'}\n`)
 
+  // Teardown: limpeza automática de massas de teste
+  try {
+    const [testCands] = await db.query(`
+      SELECT candidate_id FROM candidate
+      WHERE email1 LIKE '%@ael.dev' OR email1 LIKE '%homolog%' OR email1 LIKE '%compdf%' OR email1 LIKE '%semcurriculo%'
+    `)
+    const testIds = testCands.map(c => c.candidate_id)
+    if (testIds.length > 0) {
+      await db.query(`DELETE FROM attachment WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
+      await db.query(`DELETE FROM extra_field WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
+      await db.query(`DELETE FROM candidate_joborder_status_history WHERE candidate_id IN (?)`, [testIds])
+      await db.query(`DELETE FROM candidate_joborder WHERE candidate_id IN (?)`, [testIds])
+      await db.query(`DELETE FROM candidate WHERE candidate_id IN (?)`, [testIds])
+    }
+  } catch (cleanErr) {
+    console.warn('Aviso de limpeza de teste:', cleanErr.message)
+  }
+
   await db.end()
   process.exit(allPassed ? 0 : 1)
 }
+
 
 runHomologationSuite().catch((err) => {
   console.error(err)
