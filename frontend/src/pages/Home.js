@@ -322,8 +322,25 @@ export async function renderHome(params, appEl) {
 
   filterSearch.addEventListener('input', onFilterChange)
 
+  // Scroll suave para o botão "Ver vagas abertas" no Hero
+  document.getElementById('hero-cta-vagas')?.addEventListener('click', (e) => {
+    e.preventDefault()
+    document.getElementById('vagas')?.scrollIntoView({ behavior: 'smooth' })
+  })
+
   // Carrega vagas iniciais
   await loadJobs({})
+
+  // Auto-scroll se a rota foi acessada via #/jobs ou #vagas
+  const currentHash = window.location.hash.slice(1) || ''
+  if (currentHash === '/jobs' || currentHash.startsWith('/jobs?') || currentHash.includes('vagas')) {
+    setTimeout(() => {
+      const vagasSection = document.getElementById('vagas')
+      if (vagasSection) {
+        vagasSection.scrollIntoView({ behavior: 'smooth' })
+      }
+    }, 150)
+  }
 
   // Cleanup
   return () => {

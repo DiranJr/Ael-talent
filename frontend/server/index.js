@@ -8,15 +8,10 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import cors from 'cors'
 import express from 'express'
+import { adminAuthLimiter } from './auth/rateLimit.js'
 import { getDb } from './db.js'
 import { sendError } from './helpers.js'
 import { logger } from './logger.js'
-import { upload } from './upload.js'
-
-// Rotas públicas
-import { applyHandler } from './routes/apply.js'
-import { filtersHandler, jobDetailHandler, jobsHandler } from './routes/jobs.js'
-
 // Rotas administrativas (RH) e middleware de autenticação
 import {
   adminAuth,
@@ -26,7 +21,12 @@ import {
   adminLoginHandler,
   adminStatsHandler,
 } from './routes/admin.js'
-
+import {
+  adminDownloadAttachmentHandler,
+  adminGetCandidateDetailHandler,
+  adminGetCandidatesHandler,
+  adminUpdateCandidateStatusHandler,
+} from './routes/adminCandidates.js'
 import {
   adminCreateJobHandler,
   adminDeleteJobHandler,
@@ -34,17 +34,12 @@ import {
   adminToggleJobStatusHandler,
   adminUpdateJobHandler,
 } from './routes/adminJobs.js'
-
-import {
-  adminDownloadAttachmentHandler,
-  adminGetCandidateDetailHandler,
-  adminGetCandidatesHandler,
-  adminUpdateCandidateStatusHandler,
-} from './routes/adminCandidates.js'
-
-import { adminAuthLimiter } from './auth/rateLimit.js'
 import adminUsersRouter from './routes/adminUsers.js'
+// Rotas públicas
+import { applyHandler } from './routes/apply.js'
+import { filtersHandler, jobDetailHandler, jobsHandler } from './routes/jobs.js'
 import talentPoolRouter from './routes/talentPool.js'
+import { upload } from './upload.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
@@ -59,7 +54,16 @@ if (process.env.NODE_ENV === 'production') {
   const candidateSecret = process.env.SESSION_SECRET || ''
   const adminSecret = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || ''
 
-  const weakSecrets = new Set(['changeme', 'secret', 'default', 'ael_dev', 'admin', 'cats', 'ael_talent_candidate_secret_2024', 'ael_talent_admin_secret_2024'])
+  const weakSecrets = new Set([
+    'changeme',
+    'secret',
+    'default',
+    'ael_dev',
+    'admin',
+    'cats',
+    'ael_talent_candidate_secret_2024',
+    'ael_talent_admin_secret_2024',
+  ])
 
   if (!candidateSecret || candidateSecret.length < 32 || weakSecrets.has(candidateSecret.toLowerCase())) {
     logger.error('CRÍTICO: SESSION_SECRET inseguro ou ausente em produção! O processo será encerrado.', {
@@ -125,7 +129,7 @@ app.use(
         ? ['Content-Type', 'Authorization', 'x-test-bypass', 'x-request-id']
         : ['Content-Type', 'Authorization', 'x-request-id'],
     exposedHeaders: ['x-request-id'],
-  }),
+  })
 )
 
 app.use(express.json({ limit: '2mb' }))
@@ -172,6 +176,7 @@ app.get('/api/admin/candidates', adminAuth, adminGetCandidatesHandler)
 app.get('/api/admin/candidates/:id', adminAuth, adminGetCandidateDetailHandler)
 app.patch('/api/admin/candidates/:candidateId/jobs/:jobId/status', adminAuth, adminUpdateCandidateStatusHandler)
 app.get('/api/admin/attachments/:id/download', adminAuth, adminDownloadAttachmentHandler)
+app.get('/api/attachments/:id/download', adminDownloadAttachmentHandler)
 
 // Departamentos (Protegido)
 app.get('/api/admin/departments', adminAuth, adminGetDepartmentsHandler)

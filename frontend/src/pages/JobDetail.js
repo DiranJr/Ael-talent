@@ -1,8 +1,5 @@
-/**
- * A&L Talent — Página de Detalhe da Vaga
- */
-
-import { getJob } from '../api.js'
+import { candidateGetMe, getCandidateToken, getJob, registerTalentPool } from '../api.js'
+import { showToast } from '../components/Toast.js'
 import { navigate } from '../router.js'
 
 export async function renderJobDetail({ id }, appEl) {
@@ -10,9 +7,18 @@ export async function renderJobDetail({ id }, appEl) {
   appEl.innerHTML = renderJobDetailSkeleton()
 
   let job
+  let candidateData = null
+  const token = getCandidateToken()
+
   try {
-    const data = await getJob(id)
+    const [data, meRes] = await Promise.all([
+      getJob(id),
+      token ? candidateGetMe().catch(() => null) : Promise.resolve(null),
+    ])
     job = data.job || data
+    if (meRes?.success && meRes.candidate) {
+      candidateData = meRes.candidate
+    }
   } catch (err) {
     appEl.innerHTML = errorState(err.message)
     return
@@ -27,6 +33,12 @@ export async function renderJobDetail({ id }, appEl) {
   const location = [job.city, job.state].filter(Boolean).join(' — ') || job.location || ''
   const type = job.type || 'CLT'
   const desc = job.description || ''
+
+  const alreadyApplied = candidateData?.applications?.find(
+    (a) => String(a.joborder_id) === String(id) || String(a.job_id) === String(id)
+  )
+  const appStatusLabel = alreadyApplied ? getCandidateAppStatus(alreadyApplied) : ''
+  const jobMeta = getJobStatusMeta(job.status)
 
   appEl.innerHTML = `
     <!-- HERO DETALHE -->
@@ -50,9 +62,14 @@ export async function renderJobDetail({ id }, appEl) {
         <!-- Badges -->
         <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:1.25rem;">
           ${dept ? `<span class="badge badge-accent">${escHtml(dept)}</span>` : ''}
-          <span class="badge" style="background:rgba(0,230,118,0.15);color:#00E676;border:1px solid rgba(0,230,118,0.25);">
-            Vaga ativa
+          <span class="badge" style="background:${jobMeta.bg};color:${jobMeta.color};border:1px solid ${jobMeta.color}40;">
+            ${jobMeta.badge}
           </span>
+          ${
+            alreadyApplied
+              ? `<span class="badge" style="background:rgba(0,230,118,0.25);color:#ffffff;font-weight:700;">✓ Inscrito: ${escHtml(appStatusLabel)}</span>`
+              : ''
+          }
         </div>
 
         <!-- Título -->
@@ -90,13 +107,43 @@ export async function renderJobDetail({ id }, appEl) {
         </div>
 
         <!-- CTA rápido -->
-        <a href="#apply-section" class="btn btn-accent btn-lg" id="hero-apply-btn">
-          Candidatar-se agora
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-          </svg>
-        </a>
+        ${
+          alreadyApplied
+            ? `
+          <a href="#/candidato" class="btn btn-accent btn-lg">
+            ✓ Ver no Meu Painel (${escHtml(appStatusLabel)})
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+            </svg>
+          </a>
+        `
+            : !jobMeta.isApplyAllowed
+              ? `
+          <div style="background: rgba(255,255,255,0.15); padding: 0.75rem 1.25rem; border-radius: var(--ael-radius-md); font-weight: 700; color: #ffffff;">
+            ⚠️ Inscrições encerradas/pausadas pelo RH para esta vaga
+          </div>
+        `
+              : candidateData
+                ? `
+          <button class="btn btn-accent btn-lg hero-quick-apply-btn" type="button">
+            ⚡ Candidatar-se com 1 Clique
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+            </svg>
+          </button>
+        `
+                : `
+          <a href="#apply-section" class="btn btn-accent btn-lg" id="hero-apply-btn">
+            Candidatar-se agora
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+            </svg>
+          </a>
+        `
+        }
       </div>
     </section>
 
@@ -118,14 +165,61 @@ export async function renderJobDetail({ id }, appEl) {
             <div class="apply-card" id="apply-section">
               <div class="eyebrow" style="margin-bottom:0.75rem;">Candidatura</div>
               <h3>${escHtml(job.title)}</h3>
-              <p>Preencha seus dados e envie seu currículo. Nossa equipe de RH avaliará seu perfil.</p>
-              <a href="#/jobs/${id}/apply" class="btn btn-primary btn-full btn-lg" id="open-apply-btn">
-                Iniciar candidatura
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
-                </svg>
-              </a>
+
+              ${
+                alreadyApplied
+                  ? `
+                <div style="background: rgba(0, 91, 58, 0.08); border: 1.5px solid var(--ael-green-base); border-radius: var(--ael-radius-md); padding: 1.25rem; text-align: center; margin-block: 1rem;">
+                  <div style="font-size: 1.25rem; margin-bottom: 0.25rem;">✅</div>
+                  <div style="font-weight: 800; color: var(--ael-green-dark); font-size: 1rem; margin-bottom: 0.25rem;">
+                    Inscrição Confirmada!
+                  </div>
+                  <div style="font-size: 0.8125rem; color: var(--ael-text); margin-bottom: 0.5rem;">
+                    Etapa Atual no RH: <strong style="color: var(--ael-green-dark);">${escHtml(appStatusLabel)}</strong>
+                  </div>
+                  <a href="#/candidato" class="btn btn-primary btn-full btn-sm">
+                    Acessar Minha Área de Candidato
+                  </a>
+                </div>
+              `
+                  : !jobMeta.isApplyAllowed
+                    ? `
+                <div style="background: rgba(220, 38, 38, 0.06); border: 1px solid rgba(220,38,38,0.2); border-radius: var(--ael-radius-md); padding: 1rem; text-align: center; margin-block: 1rem;">
+                  <div style="font-weight: 700; color: #b91c1c; font-size: 0.875rem;">Inscrições Indisponíveis</div>
+                  <p style="font-size: 0.75rem; color: var(--ael-muted); margin: 0.35rem 0 0 0;">Esta vaga foi marcada como <strong>${escHtml(jobMeta.label)}</strong> pelo RH.</p>
+                </div>
+              `
+                    : candidateData
+                      ? `
+                <p style="font-size: 0.875rem; color: var(--ael-text); margin-bottom: 1rem;">
+                  Você está conectado como <strong>${escHtml(candidateData.first_name)} ${escHtml(candidateData.last_name)}</strong> (${escHtml(candidateData.email)}).
+                </p>
+
+                <button type="button" class="btn btn-primary btn-full btn-lg" id="quick-apply-btn" style="box-shadow: 0 4px 16px rgba(0, 230, 118, 0.3);">
+                  <span>⚡ Candidatar-se com 1 Clique</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                  </svg>
+                </button>
+
+                <div style="text-align: center; margin-top: 0.75rem;">
+                  <a href="#/jobs/${id}/apply" style="font-size: 0.75rem; color: var(--ael-muted); text-decoration: underline;">
+                    Deseja atualizar dados do seu perfil antes de enviar?
+                  </a>
+                </div>
+              `
+                      : `
+                <p>Preencha seus dados e envie seu currículo. Nossa equipe de RH avaliará seu perfil.</p>
+                <a href="#/jobs/${id}/apply" class="btn btn-primary btn-full btn-lg" id="open-apply-btn">
+                  Iniciar candidatura
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                  </svg>
+                </a>
+              `
+              }
 
               <!-- Detalhes da vaga -->
               <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--ael-line);">
@@ -153,10 +247,11 @@ export async function renderJobDetail({ id }, appEl) {
                 </div>
                 <div style="display:flex;justify-content:space-between;padding:0.5rem 0;font-size:0.875rem;border-top:1px solid var(--ael-line);">
                   <span style="color:var(--ael-muted);">Status</span>
-                  <span style="font-weight:600;color:#00874a;">Aberta</span>
+                  <span style="font-weight:700;color:${jobMeta.color};">${escHtml(jobMeta.label)}</span>
                 </div>
               </div>
             </div>
+
 
             <!-- Back -->
             <div style="margin-top:1rem;text-align:center;">
@@ -171,7 +266,55 @@ export async function renderJobDetail({ id }, appEl) {
     </section>
   `
 
-  // Anchor scroll para candidatura
+  // 1-Click Apply Handler para Candidato Logado
+  async function handleOneClickApply(buttonEl) {
+    if (!candidateData || !id) return
+    buttonEl.disabled = true
+    const origHtml = buttonEl.innerHTML
+    buttonEl.innerHTML = `<span>Enviando candidatura...</span>`
+
+    try {
+      const payload = new FormData()
+      payload.append('first_name', candidateData.first_name || '')
+      payload.append('last_name', candidateData.last_name || '')
+      payload.append('email', candidateData.email || '')
+      payload.append('phone', candidateData.phone || '')
+      payload.append('city', candidateData.city || '')
+      payload.append('state', candidateData.state || 'PA')
+      payload.append('interest_area', job.department || candidateData.interest_area || 'Geral')
+      payload.append('desired_role', job.title || candidateData.desired_role || '')
+      payload.append('job_id', id)
+      payload.append('educations', JSON.stringify(candidateData.educations || []))
+      payload.append('experiences', JSON.stringify(candidateData.experiences || []))
+      payload.append('key_skills', (candidateData.key_skills || []).join(', '))
+      payload.append('notes', candidateData.notes || '')
+      payload.append('consent_lgpd', 'true')
+
+      await registerTalentPool(payload)
+      showToast({
+        title: 'Candidatura Confirmada!',
+        message: `Sua candidatura para a vaga "${job.title}" foi enviada com sucesso!`,
+        type: 'success',
+      })
+      renderJobDetail({ id }, appEl)
+    } catch (err) {
+      showToast({ title: 'Erro ao candidatar-se', message: err.message, type: 'error' })
+      buttonEl.disabled = false
+      buttonEl.innerHTML = origHtml
+    }
+  }
+
+  document.getElementById('quick-apply-btn')?.addEventListener('click', (e) => {
+    handleOneClickApply(e.currentTarget)
+  })
+
+  document.querySelectorAll('.hero-quick-apply-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      handleOneClickApply(btn)
+    })
+  })
+
+  // Anchor scroll para candidatura não logada
   document.getElementById('hero-apply-btn')?.addEventListener('click', (e) => {
     e.preventDefault()
     document.getElementById('apply-section')?.scrollIntoView({ behavior: 'smooth' })
@@ -235,6 +378,81 @@ function notFoundState() {
       </div>
     </div>
   `
+}
+
+function getJobStatusMeta(jobStatus) {
+  switch (jobStatus) {
+    case 'Active':
+    case 'Active-Share':
+      return {
+        label: 'Aberta',
+        badge: 'Vaga ativa',
+        color: '#00874a',
+        bg: 'rgba(0,230,118,0.15)',
+        isApplyAllowed: true,
+      }
+    case 'On Hold':
+      return {
+        label: 'Pausada pelo RH',
+        badge: 'Inscrições em Pausa',
+        color: '#d97706',
+        bg: 'rgba(217,119,6,0.15)',
+        isApplyAllowed: false,
+      }
+    case 'Closed':
+    case 'Cancelled':
+      return {
+        label: 'Encerrada',
+        badge: 'Processo Encerrado',
+        color: '#dc2626',
+        bg: 'rgba(220,38,38,0.15)',
+        isApplyAllowed: false,
+      }
+    case 'Filled':
+      return {
+        label: 'Preenchida',
+        badge: 'Posição Preenchida',
+        color: '#4b5563',
+        bg: 'rgba(75,85,99,0.15)',
+        isApplyAllowed: false,
+      }
+    default:
+      return {
+        label: 'Aberta',
+        badge: 'Vaga ativa',
+        color: '#00874a',
+        bg: 'rgba(0,230,118,0.15)',
+        isApplyAllowed: true,
+      }
+  }
+}
+
+function getCandidateAppStatus(app) {
+  const code = parseInt(app?.status_code ?? app?.status ?? 100)
+  switch (code) {
+    case 100:
+      return '📥 Recebido / Em Análise'
+    case 200:
+      return '📞 Contactado pelo RH'
+    case 250:
+      return '💬 Resposta Registrada'
+    case 300:
+      return '🔍 Em Triagem Técnica'
+    case 400:
+      return '📤 Encaminhado à Gestão'
+    case 500:
+      return '🗣️ Entrevista Agendada'
+    case 600:
+      return '🏆 Aprovado / Proposta'
+    case 650:
+      return '📂 Banco de Talentos (Futuro)'
+    case 700:
+      return '❌ Não Selecionado nesta Vaga'
+    case 800:
+      return '🎉 Contratado(a)'
+    default:
+      return app?.status_label || '📥 Em Análise'
+  }
 }
 
 /* ─── Helpers ─────────────────────────────────────────────── */

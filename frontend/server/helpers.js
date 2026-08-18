@@ -102,6 +102,74 @@ export async function saveCandidateAttachment(dbOrConn, candidateId, file) {
 }
 
 /**
+ * Salva anexo de foto de perfil na tabela attachment do OpenCATS e extra_field
+ * @param {import('mysql2/promise').Connection|import('mysql2/promise').Pool} dbOrConn
+ * @param {number} candidateId
+ * @param {Express.Multer.File} file
+ */
+export async function saveCandidatePhoto(dbOrConn, candidateId, file) {
+  if (!file) return null
+
+  const mimeType = file.mimetype || 'image/jpeg'
+  const fileSizeKb = Math.max(1, Math.round((file.size || 0) / 1024))
+  const storedName = file.filename
+  const originalName = file.originalname || file.filename
+
+  // Remove fotos anteriores para manter apenas a mais recente
+  await dbOrConn
+    .execute(
+      `DELETE FROM attachment WHERE data_item_id = ? AND data_item_type = 100 AND (title = 'Foto de Perfil' OR content_type LIKE 'image/%')`,
+      [candidateId]
+    )
+    .catch(() => {})
+
+  const [result] = await dbOrConn.execute(
+    `
+    INSERT INTO attachment (
+      data_item_type,
+      data_item_id,
+      title,
+      original_filename,
+      stored_filename,
+      content_type,
+      resume,
+      file_size_kb,
+      md5_sum,
+      md5_sum_text,
+      date_created,
+      date_modified
+    ) VALUES (100, ?, 'Foto de Perfil', ?, ?, ?, 0, ?, '', '', NOW(), NOW())
+  `,
+    [candidateId, originalName, storedName, mimeType, fileSizeKb]
+  )
+
+  await saveCandidateExtraField(dbOrConn, candidateId, 'Foto de Perfil', storedName)
+
+  return result.insertId
+}
+
+/**
+ * Salva ou atualiza um extra_field do candidato
+ */
+export async function saveCandidateExtraField(dbOrConn, candidateId, fieldName, value) {
+  const [existing] = await dbOrConn.query(
+    'SELECT extra_field_id FROM extra_field WHERE data_item_type = 100 AND data_item_id = ? AND field_name = ?',
+    [candidateId, fieldName]
+  )
+  if (existing.length > 0) {
+    await dbOrConn.execute('UPDATE extra_field SET value = ? WHERE extra_field_id = ?', [
+      String(value || ''),
+      existing[0].extra_field_id,
+    ])
+  } else {
+    await dbOrConn.execute(
+      'INSERT INTO extra_field (data_item_type, data_item_id, field_name, value) VALUES (100, ?, ?, ?)',
+      [candidateId, fieldName, String(value || '')]
+    )
+  }
+}
+
+/**
  * Recupera extra_fields de um candidato como dicionário chave-valor
  * (Oculta campos confidenciais por padrão)
  */
@@ -177,6 +245,12 @@ export function formatCandidateProfile(c, extras = {}, apps = [], attachments = 
     }
   }
 
+  // Foto de Perfil
+  const photoAtt = attachments.find(
+    (a) => a.title === 'Foto de Perfil' || (a.content_type && a.content_type.startsWith('image/'))
+  )
+  const photo_url = photoAtt ? `/api/attachments/${photoAtt.attachment_id}/download` : null
+
   return {
     candidate_id: c.candidate_id,
     first_name: c.first_name,
@@ -204,6 +278,8 @@ export function formatCandidateProfile(c, extras = {}, apps = [], attachments = 
           .filter(Boolean)
       : [],
     source: c.source,
+    photo_url,
+    photo_attachment_id: photoAtt?.attachment_id || null,
     date_created: c.date_created,
     date_modified: c.date_modified,
     educations: educations.length

@@ -28,9 +28,12 @@ const ALLOWED_MIME = new Set([
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
 ])
 
-const ALLOWED_EXT = new Set(['.pdf', '.doc', '.docx'])
+const ALLOWED_EXT = new Set(['.pdf', '.doc', '.docx', '.jpg', '.jpeg', '.png', '.webp'])
 const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5 MB
 
 const storage = diskStorage({
@@ -41,9 +44,14 @@ const storage = diskStorage({
     // Sanitiza nome original contra path traversal e extensão
     const sanitizedOriginal = path.basename(file.originalname).replace(/[^a-zA-Z0-9._-]/g, '_')
     const rawExt = path.extname(sanitizedOriginal).toLowerCase()
-    const ext = ALLOWED_EXT.has(rawExt) ? rawExt : '.pdf'
+    const isImage =
+      file.fieldname === 'photo' ||
+      file.mimetype?.startsWith('image/') ||
+      ['.jpg', '.jpeg', '.png', '.webp'].includes(rawExt)
+    const ext = ALLOWED_EXT.has(rawExt) ? rawExt : isImage ? '.jpg' : '.pdf'
     const randomHash = crypto.randomBytes(8).toString('hex')
-    cb(null, `resume_${Date.now()}_${randomHash}${ext}`)
+    const prefix = isImage ? 'photo' : 'resume'
+    cb(null, `${prefix}_${Date.now()}_${randomHash}${ext}`)
   },
 })
 
@@ -62,7 +70,7 @@ function fileFilter(req, file, cb) {
   if (ALLOWED_MIME.has(file.mimetype) && ALLOWED_EXT.has(ext)) {
     cb(null, true)
   } else {
-    cb(new Error('Formato de arquivo não suportado. Envie currículos em PDF, DOC ou DOCX.'))
+    cb(new Error('Formato não suportado. Envie currículos em PDF/DOCX ou fotos em JPG/PNG/WEBP.'))
   }
 }
 
@@ -98,7 +106,47 @@ export async function validateUploadedFile(filePath, originalName = '') {
 
     const ext = path.extname(originalName || filePath).toLowerCase()
 
-    // 1. PDF: Deve começar com %PDF- (0x25 0x50 0x44 0x46)
+    // 1. Imagens JPEG (.jpg, .jpeg)
+    if (ext === '.jpg' || ext === '.jpeg') {
+      const isJpeg = buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+      if (!isJpeg) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        return { valid: false, error: 'Assinatura binária de imagem JPEG inválida.' }
+      }
+      return { valid: true }
+    }
+
+    // 2. Imagens PNG (.png)
+    if (ext === '.png') {
+      const isPng =
+        buffer.length >= 8 &&
+        buffer[0] === 0x89 &&
+        buffer[1] === 0x50 &&
+        buffer[2] === 0x4e &&
+        buffer[3] === 0x47 &&
+        buffer[4] === 0x0d &&
+        buffer[5] === 0x0a &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0x0a
+      if (!isPng) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        return { valid: false, error: 'Assinatura binária de imagem PNG inválida.' }
+      }
+      return { valid: true }
+    }
+
+    // 3. Imagens WEBP (.webp)
+    if (ext === '.webp') {
+      const isWebp =
+        buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP'
+      if (!isWebp) {
+        await fs.promises.unlink(filePath).catch(() => {})
+        return { valid: false, error: 'Assinatura binária de imagem WEBP inválida.' }
+      }
+      return { valid: true }
+    }
+
+    // 4. PDF: Deve começar com %PDF- (0x25 0x50 0x44 0x46)
     if (ext === '.pdf') {
       const isPdf =
         buffer.length >= 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46
@@ -109,7 +157,7 @@ export async function validateUploadedFile(filePath, originalName = '') {
       return { valid: true }
     }
 
-    // 2. DOCX: Assinatura ZIP PK (0x50 0x4B 0x03 0x04) + estrutura OpenXML
+    // 5. DOCX: Assinatura ZIP PK (0x50 0x4B 0x03 0x04) + estrutura OpenXML
     if (ext === '.docx') {
       const isZip =
         buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04
@@ -129,7 +177,7 @@ export async function validateUploadedFile(filePath, originalName = '') {
       return { valid: true }
     }
 
-    // 3. DOC Legado (Word 97-2003): Assinatura OLE Compound Document (0xD0 0xCF 0x11 0xE0 0xA1 0xB1 0x1A 0xE1)
+    // 6. DOC Legado (Word 97-2003): Assinatura OLE Compound Document (0xD0 0xCF 0x11 0xE0 0xA1 0xB1 0x1A 0xE1)
     if (ext === '.doc') {
       const isOleDoc =
         buffer.length >= 8 &&

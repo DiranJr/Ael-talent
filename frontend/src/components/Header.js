@@ -1,7 +1,4 @@
-/**
- * A&L Talent — Header / Barra de Navegação Principal
- */
-
+import { getCandidateToken, getCandidateUser } from '../api.js'
 import logoUrl from '../assets/logo.png'
 
 export function renderHeader() {
@@ -10,7 +7,13 @@ export function renderHeader() {
   header.id = 'site-header'
   header.setAttribute('role', 'banner')
 
-  header.innerHTML = `
+  function getNavHtml() {
+    const candToken = getCandidateToken()
+    const candUser = getCandidateUser()
+    const candLabel =
+      candToken && candUser?.name ? `Minha Área (${candUser.name.split(' ')[0]}) 👤` : 'Área do Candidato 👤'
+
+    return `
     <a class="sr-only skip-link" href="#main-content">Ir para o conteúdo</a>
     <div class="header-inner">
       <a class="header-brand" href="#/" aria-label="A&L Engenharia Carreiras — início">
@@ -25,7 +28,7 @@ export function renderHeader() {
         <a href="#/" class="nav-link" data-route="/">Início</a>
         <a href="#/jobs" class="nav-link" data-route="/jobs">Vagas</a>
         <a href="#/talent-pool" class="nav-link" data-route="/talent-pool">Banco de Talentos</a>
-        <a href="#/candidato" class="nav-link" data-route="/candidato" style="font-weight: 600;">Área do Candidato 👤</a>
+        <a href="#/candidato" class="nav-link" data-route="/candidato" style="font-weight: 600; ${candToken ? 'color: var(--ael-green-base); font-weight: 700;' : ''}">${candLabel}</a>
         <a href="#/admin" class="nav-link nav-admin-badge" data-route="/admin">Painel RH 🔒</a>
         <a href="https://aelengenharia.com.br/" target="_blank" rel="noreferrer" class="nav-highlight">
           aelengenharia.com.br ↗
@@ -39,7 +42,10 @@ export function renderHeader() {
         </svg>
       </button>
     </div>
-  `
+    `
+  }
+
+  header.innerHTML = getNavHtml()
 
   // Scroll behavior: mantém consistência visual de contraste
   const onScroll = () => {
@@ -48,25 +54,41 @@ export function renderHeader() {
   window.addEventListener('scroll', onScroll, { passive: true })
   onScroll()
 
-  // Marca link ativo baseado na rota
+  // Marca link ativo baseado na rota e atualiza status da navbar
   const updateActive = () => {
+    header.innerHTML = getNavHtml()
     const hash = window.location.hash.slice(1) || '/'
     header.querySelectorAll('.nav-link[data-route]').forEach((link) => {
       const route = link.dataset.route
       link.classList.toggle('active', hash === route || (route !== '/' && hash.startsWith(route)))
     })
+
+    // Re-bind click for vagas link (smooth scroll se já estiver na Home)
+    header.querySelectorAll('.nav-link[data-route="/jobs"]').forEach((link) => {
+      link.addEventListener('click', (e) => {
+        const hash = window.location.hash.slice(1) || '/'
+        const currentPath = hash.split('?')[0]
+        if (currentPath === '/' || currentPath === '/jobs' || currentPath === '') {
+          e.preventDefault()
+          const vagasEl = document.getElementById('vagas')
+          if (vagasEl) {
+            vagasEl.scrollIntoView({ behavior: 'smooth' })
+          }
+        }
+      })
+    })
+
+    // Re-bind mobile button
+    const mobileBtn = header.querySelector('#mobile-menu-btn')
+    const navMenu = header.querySelector('#header-nav')
+    mobileBtn?.addEventListener('click', () => {
+      const expanded = mobileBtn.getAttribute('aria-expanded') === 'true'
+      mobileBtn.setAttribute('aria-expanded', String(!expanded))
+      navMenu?.classList.toggle('is-open', !expanded)
+    })
   }
   window.addEventListener('hashchange', updateActive)
   updateActive()
-
-  // Mobile menu toggle
-  const mobileBtn = header.querySelector('#mobile-menu-btn')
-  const navMenu = header.querySelector('#header-nav')
-  mobileBtn?.addEventListener('click', () => {
-    const expanded = mobileBtn.getAttribute('aria-expanded') === 'true'
-    mobileBtn.setAttribute('aria-expanded', String(!expanded))
-    navMenu?.classList.toggle('is-open', !expanded)
-  })
 
   return {
     el: header,
