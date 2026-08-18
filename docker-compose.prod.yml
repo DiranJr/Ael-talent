@@ -5,12 +5,13 @@ services:
 
   # ─── 1. API BACKEND (Node.js 20 / Express) ──────────────────────────────────
   api:
-    image: node:20-alpine
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    image: ael-talent-api:1.0.0
     container_name: ael_api_prod
     restart: unless-stopped
-    working_dir: /app
     volumes:
-      - ./frontend:/app
       - uploads_data:/app/opencats/upload
     environment:
       - NODE_ENV=production
@@ -31,9 +32,10 @@ services:
       - SMTP_FROM=${SMTP_FROM}
     ports:
       - "127.0.0.1:3001:3001" # Exposição estritamente local (loopback) para o Nginx Host
-    command: sh -c "npm install --omit=dev && node server/index.js"
+    command: ["node", "server/index.js"]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3001/api/health || exit 1"]
+
       interval: 15s
       timeout: 5s
       retries: 5

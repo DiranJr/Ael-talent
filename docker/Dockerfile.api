@@ -1,0 +1,37 @@
+# ==============================================================================
+# A&L Talent — API Production Container (Node.js 20 Alpine)
+# Build determinístico com npm ci --omit=dev sem dependência de rede em runtime
+# ==============================================================================
+FROM node:20-alpine AS base
+
+WORKDIR /app
+
+# 1. Dependências do sistema (para healthcheck wget e timezone)
+RUN apk add --no-cache tzdata wget
+
+# 2. Instalação determinística de dependências de produção
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund && npm cache clean --force
+
+# 3. Cópia do código-fonte e bundle compilado da aplicação
+COPY frontend/server ./server
+COPY frontend/dist ./dist
+COPY frontend/index.html ./index.html
+COPY frontend/src ./src
+
+# 4. Criação do diretório de uploads local/fallback com permissão segura
+RUN mkdir -p /app/opencats/upload && chown -R node:node /app
+
+# 5. Execução com usuário non-root para segurança máxima
+USER node
+
+# 6. Variáveis de ambiente padrão
+ENV NODE_ENV=production
+ENV PORT=3001
+
+EXPOSE 3001
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:3001/api/health || exit 1
+
+CMD ["node", "server/index.js"]
