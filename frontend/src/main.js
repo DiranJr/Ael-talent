@@ -44,6 +44,9 @@ route('/talent-pool/register', () => import('./pages/TalentPoolRegister.js').the
 route('/banco-talentos', () => import('./pages/TalentPoolRegister.js').then((m) => m.renderTalentPoolRegister))
 route('/candidato', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
 route('/meu-perfil', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
+route('/recuperar-senha', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
+route('/reset-password', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
+route('/esqueci-senha', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
 
 // ─── Rotas Administrativas RH (Carregadas exclusivamente sob demanda) ─
 route('/admin/login', () => import('./pages/admin/AdminLogin.js').then((m) => m.renderAdminLogin))

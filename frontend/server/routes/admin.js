@@ -201,7 +201,6 @@ export async function adminStatsHandler(req, res) {
       appParams
     )
 
-
     // 6. Vagas com mais candidaturas
     const [topJobs] = await db.execute(
       `

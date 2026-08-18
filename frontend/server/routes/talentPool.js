@@ -410,9 +410,25 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
 
     console.log(`[AUTH] Senha redefinida com sucesso para o candidato ID ${user.candidate_id}`)
 
-    return sendSuccess(res, {}, 'Senha redefinida com sucesso! Você já pode acessar seu painel.')
+    const sessionToken = signCandidateToken({
+      candidate_id: user.candidate_id,
+      email: user.email1,
+      name: `${user.first_name} ${user.last_name}`.trim(),
+    })
+
+    const candidate = await getFormattedCandidate(db, user.candidate_id)
+
+    return sendSuccess(
+      res,
+      {
+        token: sessionToken,
+        candidate,
+      },
+      'Senha redefinida com sucesso! Você já está conectado ao seu painel.'
+    )
   } catch (err) {
     console.error('Erro ao redefinir senha:', err)
+
     return sendError(res, 'Erro ao redefinir senha.', 500)
   }
 })

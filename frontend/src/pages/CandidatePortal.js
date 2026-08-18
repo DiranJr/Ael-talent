@@ -1,6 +1,8 @@
 import {
+  candidateForgotPassword,
   candidateGetMe,
   candidateLogin,
+  candidateResetPassword,
   candidateSetPassword,
   clearCandidateAuth,
   getCandidateToken,
@@ -45,101 +47,264 @@ export async function renderCandidatePortal(params, appEl) {
   }
 
   if (!candidateData) {
-    renderLoginScreen(appEl, departments)
+    renderAuthScreen(appEl, departments, params)
   } else {
     renderPortalDashboard(appEl, candidateData, departments, jobsList)
   }
 }
 
-// ─── TELA DE LOGIN COM E-MAIL E SENHA ────────────────────────
-function renderLoginScreen(appEl, departments) {
-  let isFirstAccessMode = false
+// ─── TELA DE AUTENTICAÇÃO E RECUPERAÇÃO DE SENHA DO CANDIDATO ────────────────
+function renderAuthScreen(appEl, departments, initialParams = {}) {
+  // Modos: 'login' | 'forgot' | 'reset' | 'first_access'
+  let currentMode = initialParams?.token ? 'reset' : 'login'
   let pendingEmail = ''
+  let resetToken = initialParams?.token || ''
 
   function renderForm() {
+    let cardContent = ''
+
+    if (currentMode === 'login') {
+      cardContent = `
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <div style="
+            width: 56px; height: 56px; border-radius: var(--ael-radius-md);
+            background: rgba(0, 91, 58, 0.1); color: var(--ael-green-base);
+            display: flex; align-items: center; justify-content: center;
+            margin-inline: auto; margin-bottom: 1rem;
+          ">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Portal do Candidato</h2>
+          <p style="font-size: 0.875rem; color: var(--ael-muted); margin-top: 0.25rem;">
+            Acesse seu perfil com e-mail e senha cadastrados.
+          </p>
+        </div>
+
+        <form id="candidate-login-form">
+          <div class="form-group">
+            <label class="form-label" for="cand-login-email">Seu E-mail *</label>
+            <input
+              id="cand-login-email"
+              type="email"
+              class="form-control"
+              placeholder="seu.email@exemplo.com"
+              value="${escAttr(pendingEmail)}"
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label class="form-label" for="cand-login-password" style="margin-bottom: 0;">Sua Senha *</label>
+              <button type="button" id="btn-goto-forgot" style="background: none; border: none; font-size: 0.8125rem; color: var(--ael-green-base); font-weight: 600; cursor: pointer; text-decoration: underline; padding: 0;">
+                Esqueceu a senha?
+              </button>
+            </div>
+            <div style="position: relative;">
+              <input
+                id="cand-login-password"
+                type="password"
+                class="form-control"
+                placeholder="Sua senha secreta"
+                style="padding-right: 2.75rem;"
+                required
+              />
+              <button type="button" class="btn-toggle-pwd" data-target="cand-login-password" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--ael-muted); padding: 0.25rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary btn-full btn-lg" id="cand-login-btn">
+            <span>Entrar no Meu Painel</span>
+          </button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.25rem;">
+          <button type="button" id="btn-goto-first-access" style="background: none; border: none; font-size: 0.8125rem; color: var(--ael-muted); font-weight: 500; cursor: pointer;">
+            Primeiro acesso? <strong style="color: var(--ael-green-base);">Cadastre sua senha aqui</strong>
+          </button>
+        </div>
+      `
+    } else if (currentMode === 'forgot') {
+      cardContent = `
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <div style="
+            width: 56px; height: 56px; border-radius: var(--ael-radius-md);
+            background: rgba(234, 88, 12, 0.1); color: #ea580c;
+            display: flex; align-items: center; justify-content: center;
+            margin-inline: auto; margin-bottom: 1rem;
+          ">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+          </div>
+          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Recuperar Senha</h2>
+          <p style="font-size: 0.875rem; color: var(--ael-muted); margin-top: 0.25rem;">
+            Informe o e-mail cadastrado no Banco de Talentos para redefinir sua senha.
+          </p>
+        </div>
+
+        <form id="candidate-forgot-form">
+          <div class="form-group">
+            <label class="form-label" for="forgot-email">Seu E-mail Cadastrado *</label>
+            <input
+              id="forgot-email"
+              type="email"
+              class="form-control"
+              placeholder="seu.email@exemplo.com"
+              value="${escAttr(pendingEmail)}"
+              required
+            />
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary btn-full btn-lg" id="forgot-submit-btn">
+              <span>Enviar Instruções de Recuperação</span>
+            </button>
+            <button type="button" class="btn btn-outline btn-full" id="forgot-cancel-btn">
+              Voltar ao Login
+            </button>
+          </div>
+        </form>
+      `
+    } else if (currentMode === 'reset') {
+      cardContent = `
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <div style="
+            width: 56px; height: 56px; border-radius: var(--ael-radius-md);
+            background: rgba(0, 91, 58, 0.1); color: var(--ael-green-base);
+            display: flex; align-items: center; justify-content: center;
+            margin-inline: auto; margin-bottom: 1rem;
+          ">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+          </div>
+          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Redefinir Nova Senha</h2>
+          <p style="font-size: 0.875rem; color: var(--ael-muted); margin-top: 0.25rem;">
+            Informe o token de recuperação e crie sua nova senha segura.
+          </p>
+        </div>
+
+        <form id="candidate-reset-form">
+          <div class="form-group">
+            <label class="form-label" for="reset-token-input">Código / Token de Recuperação *</label>
+            <input
+              id="reset-token-input"
+              type="text"
+              class="form-control"
+              placeholder="Cole o token recebido"
+              value="${escAttr(resetToken)}"
+              required
+            />
+            <small style="font-size: 0.75rem; color: var(--ael-muted); margin-top: 0.25rem; display: block;">
+              Válido por 15 minutos a partir da solicitação.
+            </small>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="reset-new-pass">Nova Senha (mínimo 8 caracteres) *</label>
+            <div style="position: relative;">
+              <input
+                id="reset-new-pass"
+                type="password"
+                class="form-control"
+                placeholder="Crie sua nova senha"
+                minlength="8"
+                style="padding-right: 2.75rem;"
+                required
+              />
+              <button type="button" class="btn-toggle-pwd" data-target="reset-new-pass" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--ael-muted); padding: 0.25rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="reset-pass-confirm">Confirmar Nova Senha *</label>
+            <div style="position: relative;">
+              <input
+                id="reset-pass-confirm"
+                type="password"
+                class="form-control"
+                placeholder="Repita a nova senha"
+                minlength="8"
+                style="padding-right: 2.75rem;"
+                required
+              />
+              <button type="button" class="btn-toggle-pwd" data-target="reset-pass-confirm" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--ael-muted); padding: 0.25rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary btn-full btn-lg" id="reset-submit-btn">
+              <span>Salvar Nova Senha & Acessar</span>
+            </button>
+            <button type="button" class="btn btn-outline btn-full" id="reset-cancel-btn">
+              Voltar / Solicitar Novo Código
+            </button>
+          </div>
+        </form>
+      `
+    } else if (currentMode === 'first_access') {
+      cardContent = `
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <div style="
+            width: 56px; height: 56px; border-radius: var(--ael-radius-md);
+            background: rgba(0, 91, 58, 0.1); color: var(--ael-green-base);
+            display: flex; align-items: center; justify-content: center;
+            margin-inline: auto; margin-bottom: 1rem;
+          ">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
+          </div>
+          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Primeiro Acesso</h2>
+          <p style="font-size: 0.875rem; color: var(--ael-muted); margin-top: 0.25rem;">
+            Cadastre sua senha segura para gerenciar seu perfil.
+          </p>
+        </div>
+
+        <form id="candidate-first-access-form">
+          <div class="form-group">
+            <label class="form-label" for="first-email">Confirme seu E-mail Cadastrado *</label>
+            <input id="first-email" type="email" class="form-control" placeholder="seu.email@exemplo.com" value="${escAttr(pendingEmail)}" required />
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="first-pass">Nova Senha (mínimo 8 caracteres) *</label>
+            <div style="position: relative;">
+              <input id="first-pass" type="password" class="form-control" placeholder="Crie sua nova senha segura" minlength="8" style="padding-right: 2.75rem;" required />
+              <button type="button" class="btn-toggle-pwd" data-target="first-pass" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--ael-muted); padding: 0.25rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="first-pass-confirm">Confirmar Nova Senha *</label>
+            <div style="position: relative;">
+              <input id="first-pass-confirm" type="password" class="form-control" placeholder="Repita a nova senha" minlength="8" style="padding-right: 2.75rem;" required />
+              <button type="button" class="btn-toggle-pwd" data-target="first-pass-confirm" style="position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--ael-muted); padding: 0.25rem;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1.5rem;">
+            <button type="submit" class="btn btn-primary btn-full btn-lg" id="first-submit-btn">
+              <span>Salvar Senha & Acessar</span>
+            </button>
+            <button type="button" class="btn btn-outline btn-full" id="first-cancel-btn">
+              Voltar ao Login
+            </button>
+          </div>
+        </form>
+      `
+    }
+
     appEl.innerHTML = `
       <div style="background: var(--ael-surface); min-height: 100vh; padding-top: calc(var(--ael-header-h) + 2.5rem); padding-bottom: 5rem; display: flex; align-items: center;">
         <div class="container" style="max-width: 480px; margin-inline: auto;">
           <div class="data-card" style="padding: 2.5rem 2rem;">
-            <div style="text-align: center; margin-bottom: 2rem;">
-              <div style="
-                width: 56px; height: 56px; border-radius: var(--ael-radius-md);
-                background: rgba(0, 91, 58, 0.1); color: var(--ael-green-base);
-                display: flex; align-items: center; justify-content: center;
-                margin-inline: auto; margin-bottom: 1rem;
-              ">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-              </div>
-              <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Portal do Candidato</h2>
-              <p style="font-size: 0.875rem; color: var(--ael-muted); margin-top: 0.25rem;">
-                ${isFirstAccessMode ? 'Cadastre sua senha segura de acesso.' : 'Acesse seu perfil com e-mail e senha cadastrados.'}
-              </p>
-            </div>
-
-            ${
-              !isFirstAccessMode
-                ? `
-              <!-- FORMULÁRIO DE LOGIN NORMAL -->
-              <form id="candidate-login-form">
-                <div class="form-group">
-                  <label class="form-label" for="cand-login-email">Seu E-mail *</label>
-                  <input
-                    id="cand-login-email"
-                    type="email"
-                    class="form-control"
-                    placeholder="seu.email@exemplo.com"
-                    value="${escAttr(pendingEmail)}"
-                    required
-                  />
-                </div>
-
-                <div class="form-group">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
-                    <label class="form-label" for="cand-login-password" style="margin-bottom: 0;">Sua Senha *</label>
-                    <button type="button" id="cand-forgot-pwd-btn" style="background: none; border: none; font-size: 0.75rem; color: var(--ael-green-base); font-weight: 600; cursor: pointer;">
-                      Criar / Redefinir Senha
-                    </button>
-                  </div>
-                  <input
-                    id="cand-login-password"
-                    type="password"
-                    class="form-control"
-                    placeholder="Sua senha secreta"
-                    required
-                  />
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-full btn-lg" id="cand-login-btn">
-                  <span>Entrar no Meu Painel</span>
-                </button>
-              </form>
-            `
-                : `
-              <!-- FORMULÁRIO DE PRIMEIRO ACESSO / DEFINIR SENHA -->
-              <form id="candidate-setpwd-form">
-                <div class="form-group">
-                  <label class="form-label" for="setpwd-email">Confirme seu E-mail *</label>
-                  <input id="setpwd-email" type="email" class="form-control" value="${escAttr(pendingEmail)}" required />
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label" for="setpwd-pass">Nova Senha (mínimo 8 caracteres) *</label>
-                  <input id="setpwd-pass" type="password" class="form-control" placeholder="Crie sua nova senha segura" minlength="8" required />
-                </div>
-
-                <div class="form-group">
-                  <label class="form-label" for="setpwd-pass-confirm">Confirmar Nova Senha *</label>
-                  <input id="setpwd-pass-confirm" type="password" class="form-control" placeholder="Repita a nova senha" minlength="8" required />
-                </div>
-
-                <div style="display: flex; gap: 0.75rem; margin-top: 1.5rem;">
-                  <button type="button" class="btn btn-outline" id="setpwd-cancel-btn">Cancelar</button>
-                  <button type="submit" class="btn btn-primary btn-full" id="setpwd-submit-btn">Salvar Senha & Acessar</button>
-                </div>
-              </form>
-            `
-            }
-
+            ${cardContent}
             <div style="text-align: center; margin-top: 1.75rem; font-size: 0.8125rem; color: var(--ael-muted); border-top: 1px solid var(--ael-line); padding-top: 1.25rem;">
               Ainda não possui cadastro no Banco de Talentos?
               <a href="#/talent-pool/register" style="color: var(--ael-green-base); font-weight: 700; text-decoration: none;">Cadastrar Perfil</a>
@@ -148,23 +313,54 @@ function renderLoginScreen(appEl, departments) {
         </div>
       </div>
     `
-    bindLoginEvents()
+
+    bindAuthEvents()
   }
 
-  function bindLoginEvents() {
-    // Redefinir / Criar Senha
-    document.getElementById('cand-forgot-pwd-btn')?.addEventListener('click', () => {
-      pendingEmail = document.getElementById('cand-login-email')?.value.trim() || ''
-      isFirstAccessMode = true
+  function bindAuthEvents() {
+    // Alternar visibilidade de senhas
+    document.querySelectorAll('.btn-toggle-pwd').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const targetId = btn.dataset.target
+        const input = document.getElementById(targetId)
+        if (!input) return
+        const isPassword = input.type === 'password'
+        input.type = isPassword ? 'text' : 'password'
+        btn.innerHTML = isPassword
+          ? `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9.88 9.88 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" x2="22" y1="2" y2="22"/></svg>`
+          : `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`
+      })
+    })
+
+    // Navegações entre modos
+    document.getElementById('btn-goto-forgot')?.addEventListener('click', () => {
+      pendingEmail = document.getElementById('cand-login-email')?.value.trim() || pendingEmail
+      currentMode = 'forgot'
       renderForm()
     })
 
-    document.getElementById('setpwd-cancel-btn')?.addEventListener('click', () => {
-      isFirstAccessMode = false
+    document.getElementById('btn-goto-first-access')?.addEventListener('click', () => {
+      pendingEmail = document.getElementById('cand-login-email')?.value.trim() || pendingEmail
+      currentMode = 'first_access'
       renderForm()
     })
 
-    // Submit de Login
+    document.getElementById('forgot-cancel-btn')?.addEventListener('click', () => {
+      currentMode = 'login'
+      renderForm()
+    })
+
+    document.getElementById('reset-cancel-btn')?.addEventListener('click', () => {
+      currentMode = 'forgot'
+      renderForm()
+    })
+
+    document.getElementById('first-cancel-btn')?.addEventListener('click', () => {
+      currentMode = 'login'
+      renderForm()
+    })
+
+    // 1. Submit de Login
     document.getElementById('candidate-login-form')?.addEventListener('submit', async (e) => {
       e.preventDefault()
       const email = document.getElementById('cand-login-email').value.trim()
@@ -179,7 +375,7 @@ function renderLoginScreen(appEl, departments) {
         if (res.first_access) {
           showToast({ title: 'Primeiro Acesso', message: res.message, type: 'info' })
           pendingEmail = email
-          isFirstAccessMode = true
+          currentMode = 'first_access'
           renderForm()
           return
         }
@@ -196,31 +392,116 @@ function renderLoginScreen(appEl, departments) {
       }
     })
 
-    // Submit de Definir Nova Senha
-    document.getElementById('candidate-setpwd-form')?.addEventListener('submit', async (e) => {
+    // 2. Submit de Solicitação de Recuperação (Forgot)
+    document.getElementById('candidate-forgot-form')?.addEventListener('submit', async (e) => {
       e.preventDefault()
-      const email = document.getElementById('setpwd-email').value.trim()
-      const pass = document.getElementById('setpwd-pass').value
-      const pass2 = document.getElementById('setpwd-pass-confirm').value
+      const email = document.getElementById('forgot-email').value.trim()
+      const btn = document.getElementById('forgot-submit-btn')
+
+      btn.disabled = true
+      btn.querySelector('span').textContent = 'Enviando instruções...'
+
+      try {
+        const res = await candidateForgotPassword(email)
+        pendingEmail = email
+
+        if (res.dev_reset_token) {
+          resetToken = res.dev_reset_token
+          showToast({
+            title: 'Código Gerado',
+            message: 'Token de redefinição gerado (válido por 15 minutos).',
+            type: 'info',
+          })
+        } else {
+          showToast({
+            title: 'Solicitação Enviada',
+            message: res.message || 'Verifique sua caixa de entrada para obter o link de recuperação.',
+            type: 'success',
+          })
+        }
+
+        currentMode = 'reset'
+        renderForm()
+      } catch (err) {
+        showToast({ title: 'Erro na Solicitação', message: err.message, type: 'error' })
+        btn.disabled = false
+        btn.querySelector('span').textContent = 'Enviar Instruções de Recuperação'
+      }
+    })
+
+    // 3. Submit de Redefinição com Token (Reset)
+    document.getElementById('candidate-reset-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const token = document.getElementById('reset-token-input').value.trim()
+      const pass = document.getElementById('reset-new-pass').value
+      const pass2 = document.getElementById('reset-pass-confirm').value
 
       if (pass !== pass2) {
         showToast({ title: 'Senhas Diferentes', message: 'A confirmação de senha não coincide.', type: 'error' })
         return
       }
 
-      const btn = document.getElementById('setpwd-submit-btn')
+      if (pass.length < 8) {
+        showToast({ title: 'Senha Curta', message: 'A nova senha deve ter no mínimo 8 caracteres.', type: 'error' })
+        return
+      }
+
+      const btn = document.getElementById('reset-submit-btn')
       btn.disabled = true
-      btn.textContent = 'Salvando...'
+      btn.querySelector('span').textContent = 'Redefinindo senha...'
+
+      try {
+        const res = await candidateResetPassword(token, pass)
+        if (res.token && res.candidate) {
+          setCandidateAuth(res.token, res.candidate)
+          showToast({
+            title: 'Senha Redefinida com Sucesso',
+            message: `Olá, ${res.candidate.first_name}! Você já está conectado.`,
+            type: 'success',
+          })
+          renderPortalDashboard(appEl, res.candidate, departments)
+        } else {
+          showToast({ title: 'Sucesso', message: res.message || 'Senha redefinida com sucesso!', type: 'success' })
+          currentMode = 'login'
+          renderForm()
+        }
+      } catch (err) {
+        showToast({ title: 'Erro ao Redefinir', message: err.message, type: 'error' })
+        btn.disabled = false
+        btn.querySelector('span').textContent = 'Salvar Nova Senha & Acessar'
+      }
+    })
+
+    // 4. Submit de Primeiro Acesso (First Access)
+    document.getElementById('candidate-first-access-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const email = document.getElementById('first-email').value.trim()
+      const pass = document.getElementById('first-pass').value
+      const pass2 = document.getElementById('first-pass-confirm').value
+
+      if (pass !== pass2) {
+        showToast({ title: 'Senhas Diferentes', message: 'A confirmação de senha não coincide.', type: 'error' })
+        return
+      }
+
+      if (pass.length < 8) {
+        showToast({ title: 'Senha Curta', message: 'A nova senha deve ter no mínimo 8 caracteres.', type: 'error' })
+        return
+      }
+
+      const btn = document.getElementById('first-submit-btn')
+      btn.disabled = true
+      btn.querySelector('span').textContent = 'Salvando...'
 
       try {
         const res = await candidateSetPassword(email, pass)
         setCandidateAuth(res.token, res.candidate)
-        showToast({ title: 'Senha Salva', message: res.message, type: 'success' })
+        showToast({ title: 'Senha Cadastrada', message: res.message || 'Senha criada com sucesso!', type: 'success' })
         renderPortalDashboard(appEl, res.candidate, departments)
       } catch (err) {
-        showToast({ title: 'Erro ao Salvar Senha', message: err.message, type: 'error' })
+        showToast({ title: 'Erro ao Cadastrar Senha', message: err.message, type: 'error' })
         btn.disabled = false
-        btn.textContent = 'Salvar Senha & Acessar'
+        btn.querySelector('span').textContent = 'Salvar Senha & Acessar'
       }
     })
   }
@@ -758,7 +1039,7 @@ function renderPortalDashboard(appEl, cand, departments, jobsList = []) {
     document.getElementById('cand-logout-btn')?.addEventListener('click', () => {
       clearCandidateAuth()
       showToast({ title: 'Sessão Encerrada', message: 'Você saiu do portal do candidato.', type: 'info' })
-      renderLoginScreen(appEl, departments)
+      renderAuthScreen(appEl, departments)
     })
 
     // Tabs
