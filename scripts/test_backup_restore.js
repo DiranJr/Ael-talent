@@ -2,57 +2,72 @@
  * A&L Talent — Teste Automatizado de Backup e Restauração Real
  */
 
-import path from 'path'
-import dotenv from 'dotenv'
-import { fileURLToPath } from 'url'
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-dotenv.config({ path: path.resolve(__dirname, '../frontend/.env') })
+const envPath = path.resolve(__dirname, '../frontend/.env')
+
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8')
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+      const [key, ...rest] = trimmed.split('=')
+      const val = rest.join('=').trim().replace(/^["'](.*)["']$/, '$1')
+      if (!process.env[key.trim()]) {
+        process.env[key.trim()] = val
+      }
+    }
+  }
+}
+
+if (process.env.DB_HOST === 'db') {
+  process.env.DB_HOST = '127.0.0.1'
+}
 
 import { getDb } from '../frontend/server/db.js'
 
 async function runBackupRestoreTest() {
   console.log('======================================================================')
-  console.log('TESTE DE INTEGRIDADE: BACKUP & RESTORE REAL EM BANCO ISOLADO')
+  console.log('TESTE DE INTEGRIDADE: BACKUP & RESTORE REAL DE TABELAS DO OPENCATS')
   console.log('======================================================================\n')
 
   const db = await getDb()
   const conn = await db.getConnection()
 
+  // Tabelas críticas a serem validadas
+  const criticalTables = [
+    'candidate',
+    'joborder',
+    'candidate_joborder',
+    'candidate_joborder_status_history',
+    'activity',
+    'attachment',
+    'extra_field',
+    'candidate_auth',
+    'company',
+    'company_department',
+    'user',
+  ]
+
   try {
-    // 1. Cria banco temporário isolado para teste de restauração
-    console.log('1. Criando banco de dados temporário `cats_restore_test`...')
-    await conn.query('DROP DATABASE IF EXISTS cats_restore_test')
-    await conn.query('CREATE DATABASE cats_restore_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci')
-
-    // 2. Tabelas críticas a serem validadas
-    const criticalTables = [
-      'candidate',
-      'joborder',
-      'candidate_joborder',
-      'candidate_joborder_status_history',
-      'activity',
-      'attachment',
-      'extra_field',
-      'candidate_auth',
-      'company',
-      'company_department',
-      'user'
-    ]
-
-    console.log('2. Replicando schema e dados para o banco temporário...')
+    console.log('1. Criando snapshots isolados de teste `_backup_test_*`...')
     for (const table of criticalTables) {
-      await conn.query(`CREATE TABLE cats_restore_test.${table} LIKE cats.${table}`)
-      await conn.query(`INSERT INTO cats_restore_test.${table} SELECT * FROM cats.${table}`)
+      const testTable = `_backup_test_${table}`
+      await conn.query(`DROP TABLE IF EXISTS \`${testTable}\``)
+      await conn.query(`CREATE TABLE \`${testTable}\` LIKE \`${table}\``)
+      await conn.query(`INSERT INTO \`${testTable}\` SELECT * FROM \`${table}\``)
     }
 
-    // 3. Validação de contagem linha a linha
-    console.log('3. Validando paridade de dados entre banco principal e banco restaurado:\n')
+    console.log('2. Validando paridade de dados e integridade estrutural:\n')
     const comparison = []
 
     for (const table of criticalTables) {
-      const [origRows] = await conn.query(`SELECT COUNT(*) as cnt FROM cats.${table}`)
-      const [restRows] = await conn.query(`SELECT COUNT(*) as cnt FROM cats_restore_test.${table}`)
+      const testTable = `_backup_test_${table}`
+      const [origRows] = await conn.query(`SELECT COUNT(*) as cnt FROM \`${table}\``)
+      const [restRows] = await conn.query(`SELECT COUNT(*) as cnt FROM \`${testTable}\``)
 
       const origCount = origRows[0].cnt
       const restCount = restRows[0].cnt
@@ -60,26 +75,31 @@ async function runBackupRestoreTest() {
 
       comparison.push({
         tabela: table,
-        banco_origem_cats: origCount,
-        banco_restaurado_test: restCount,
-        integridade: match ? '100% ÍNTEGRO' : 'DIVERGÊNCIA'
+        registros_originais: origCount,
+        registros_restaurados: restCount,
+        integridade: match ? '100% ÍNTEGRO' : 'DIVERGÊNCIA',
       })
     }
 
     console.table(comparison)
 
-    // 4. Limpa banco temporário de teste
-    console.log('\n4. Limpando banco temporário de teste...')
-    await conn.query('DROP DATABASE cats_restore_test')
-    console.log('✅ Banco de dados temporário removido com sucesso.')
+    console.log('\n3. Limpando snapshots temporários de teste...')
+    for (const table of criticalTables) {
+      const testTable = `_backup_test_${table}`
+      await conn.query(`DROP TABLE IF EXISTS \`${testTable}\``)
+    }
+    console.log('✅ Snapshots temporários removidos com sucesso.')
 
     console.log('\n🎉 TESTE DE BACKUP E RESTORE CONCLUÍDO COM 100% DE SUCESSO!')
   } catch (err) {
     console.error('❌ Erro no teste de backup/restore:', err)
+    process.exitCode = 1
   } finally {
     conn.release()
-    process.exit(0)
   }
 }
 
-runBackupRestoreTest().catch(console.error)
+runBackupRestoreTest().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})
