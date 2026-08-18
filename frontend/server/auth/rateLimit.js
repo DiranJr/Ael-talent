@@ -8,11 +8,12 @@ export const isTestEnv = () => process.env.NODE_ENV === 'test'
 
 /**
  * Limitador para tentativas de login de candidatos e definição de senha
- * 10 requisições a cada 15 minutos por IP
+ * Em produção: 10 requisições a cada 15 minutos por IP
+ * Em desenvolvimento: 500 requisições
  */
 export const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: process.env.NODE_ENV === 'production' ? 10 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',
@@ -23,11 +24,12 @@ export const authLimiter = rateLimit({
 
 /**
  * Limitador estrito para recuperação e redefinição de senha
- * 5 requisições a cada 15 minutos por IP
+ * Em produção: 5 requisições a cada 15 minutos por IP
+ * Em desenvolvimento: 200 requisições
  */
 export const passwordResetLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: process.env.NODE_ENV === 'production' ? 5 : 200,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',
@@ -38,11 +40,12 @@ export const passwordResetLimiter = rateLimit({
 
 /**
  * Limitador para login administrativo do RH
- * 10 requisições a cada 15 minutos por IP
+ * Em produção: 10 requisições a cada 15 minutos por IP
+ * Em desenvolvimento: 500 requisições
  */
 export const adminAuthLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: process.env.NODE_ENV === 'production' ? 10 : 500,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',
@@ -53,11 +56,12 @@ export const adminAuthLimiter = rateLimit({
 
 /**
  * Limitador para formulários de candidatura e cadastro público
- * 30 requisições a cada 15 minutos por IP
+ * Em produção: 30 requisições a cada 15 minutos por IP
+ * Em desenvolvimento: 1000 requisições
  */
 export const registrationLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: process.env.NODE_ENV === 'production' ? 30 : 1000,
   standardHeaders: true,
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',

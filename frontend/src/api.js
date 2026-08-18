@@ -33,9 +33,17 @@ async function apiFetch(path, options = {}) {
     ...(options.headers || {}),
   }
 
-  const token = getAdminToken()
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`
+  // Se nenhum header de Autorização foi explicitamente passado:
+  if (!headers['Authorization']) {
+    const adminToken = getAdminToken()
+    if (adminToken && (path.startsWith('/admin') || path.startsWith('/talent-pool/candidates'))) {
+      headers['Authorization'] = `Bearer ${adminToken}`
+    } else {
+      const candToken = getCandidateToken()
+      if (candToken && (path.startsWith('/talent-pool/me') || path.startsWith('/talent-pool/photo'))) {
+        headers['Authorization'] = `Bearer ${candToken}`
+      }
+    }
   }
 
   try {
@@ -302,25 +310,34 @@ export function clearCandidateAuth() {
 
 /** Login do candidato com e-mail e senha */
 export async function candidateLogin(email, password) {
-  return apiFetch('/talent-pool/login', {
+  const data = await apiFetch('/talent-pool/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   })
+  if (data.token && data.candidate) {
+    setCandidateAuth(data.token, data.candidate)
+  }
+  return data
 }
 
 /** Definir / cadastrar senha do candidato */
 export async function candidateSetPassword(email, password) {
-  return apiFetch('/talent-pool/set-password', {
+  const data = await apiFetch('/talent-pool/set-password', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   })
+  if (data.token && data.candidate) {
+    setCandidateAuth(data.token, data.candidate)
+  }
+  return data
 }
 
 /** Obter perfil do candidato autenticado */
 export async function candidateGetMe() {
   const token = getCandidateToken()
+  if (!token) return null
   return apiFetch('/talent-pool/me', {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${token}` },
   })
 }
 
@@ -338,4 +355,23 @@ export async function candidateResetPassword(token, password) {
     method: 'POST',
     body: JSON.stringify({ token, password }),
   })
+}
+
+/** Upload de foto de perfil do candidato */
+export async function uploadCandidatePhoto(file) {
+  const token = getCandidateToken()
+  const formData = new FormData()
+  formData.append('photo', file)
+  const res = await fetch('/api/talent-pool/photo', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: formData,
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.message || 'Erro ao enviar foto de perfil.')
+  }
+  return data
 }

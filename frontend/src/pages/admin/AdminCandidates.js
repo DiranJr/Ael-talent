@@ -187,11 +187,25 @@ function renderCandidatesRows(candidates, currentUser) {
       <tr data-id="${c.candidate_id}" data-job-id="${c.joborder_id}">
         <!-- CANDIDATO -->
         <td>
-          <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">${escHtml(c.full_name)}</div>
-          <div style="font-size: 0.75rem; color: var(--ael-muted);">
-            ${escHtml([c.city, c.state].filter(Boolean).join(' - ') || 'Localidade não informada')}
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 40px; height: 40px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 1.5px solid var(--ael-line); background: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+              ${
+                c.photo_url
+                  ? `<img src="${c.photo_url}" alt="${escAttr(c.full_name)}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                  : `<div style="width: 100%; height: 100%; background: rgba(0, 91, 58, 0.12); color: var(--ael-green-dark); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.875rem;">
+                      ${(c.first_name || 'C').charAt(0).toUpperCase()}
+                    </div>`
+              }
+            </div>
+            <div>
+              <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">${escHtml(c.full_name)}</div>
+              <div style="font-size: 0.75rem; color: var(--ael-muted);">
+                ${escHtml([c.city, c.state].filter(Boolean).join(' - ') || 'Localidade não informada')}
+              </div>
+            </div>
           </div>
         </td>
+
 
         <!-- CONTATO -->
         <td>
@@ -355,6 +369,15 @@ function escHtml(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+function escAttr(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
 }
 
 function formatDate(d) {

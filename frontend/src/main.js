@@ -39,9 +39,9 @@ route('/', () => import('./pages/Home.js').then((m) => m.renderHome))
 route('/jobs', () => import('./pages/Home.js').then((m) => m.renderHome))
 route('/jobs/:id', () => import('./pages/JobDetail.js').then((m) => m.renderJobDetail))
 route('/jobs/:id/apply', () => import('./pages/TalentPoolRegister.js').then((m) => m.renderTalentPoolRegister))
-route('/talent-pool', () => import('./pages/TalentPool.js').then((m) => m.renderTalentPool))
+route('/talent-pool', () => import('./pages/TalentPoolRegister.js').then((m) => m.renderTalentPoolRegister))
 route('/talent-pool/register', () => import('./pages/TalentPoolRegister.js').then((m) => m.renderTalentPoolRegister))
-route('/banco-talentos', () => import('./pages/TalentPool.js').then((m) => m.renderTalentPool))
+route('/banco-talentos', () => import('./pages/TalentPoolRegister.js').then((m) => m.renderTalentPoolRegister))
 route('/candidato', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
 route('/meu-perfil', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
 
@@ -59,7 +59,10 @@ route('/admin/users', () => import('./pages/admin/AdminUsers.js').then((m) => m.
 // ─── Inicia o router ───────────────────────────────────────────
 initRouter(mainEl)
 
-// ─── Scroll to top on route change ─────────────────────────────
+// ─── Scroll to top on route change (exceto se for para a seção de vagas) ─────────────────────────────
 window.addEventListener('hashchange', () => {
-  window.scrollTo({ top: 0, behavior: 'instant' })
+  const hash = window.location.hash.slice(1) || '/'
+  if (hash !== '/jobs' && !hash.includes('vagas')) {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
 })

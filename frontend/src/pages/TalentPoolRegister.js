@@ -8,7 +8,15 @@
  * Rota: #/talent-pool/register e #/jobs/:id/apply
  */
 
-import { getFilters, getJob, lookupCandidate, registerTalentPool, setCandidateAuth } from '../api.js'
+import {
+  candidateGetMe,
+  getCandidateToken,
+  getFilters,
+  getJob,
+  lookupCandidate,
+  registerTalentPool,
+  setCandidateAuth,
+} from '../api.js'
 import { showToast } from '../components/Toast.js'
 
 const SUGGESTED_SKILLS = [
@@ -40,48 +48,139 @@ export async function renderTalentPoolRegister(params, appEl) {
   const jobId = params?.id || new URLSearchParams(window.location.hash.split('?')[1] || '').get('job_id') || null
   let targetJob = null
   let departments = []
+  let loggedInCandidate = null
+  const candidateToken = getCandidateToken()
 
   try {
-    const [filtersRes, jobRes] = await Promise.all([
+    const [filtersRes, jobRes, meRes] = await Promise.all([
       getFilters(),
       jobId ? getJob(jobId).catch(() => null) : Promise.resolve(null),
+      candidateToken ? candidateGetMe().catch(() => null) : Promise.resolve(null),
     ])
     departments = (filtersRes.departments || []).filter((d) => d.value)
     if (jobRes?.job) {
       targetJob = jobRes.job
     }
+    if (meRes?.success && meRes.candidate) {
+      loggedInCandidate = meRes.candidate
+    }
   } catch (err) {
     console.error('Erro ao inicializar formulário:', err)
   }
 
-  // Estado do formulário
+  // Estado do formulário pré-preenchido com os dados do candidato logado
   const formData = {
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    city: '',
-    state: 'PA',
-    linkedin: '',
-    interest_area: targetJob?.department_name || '',
-    desired_role: targetJob?.title || '',
-    desired_pay: '',
-    travel_availability: 'Total (Qualquer região)',
-    driver_license: 'Não possui',
-    can_relocate: '1',
-    educations: [{ level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' }],
-    experiences: [{ role: '', company: '', period: '', is_current: false, activities: '' }],
-    notes: '',
-    key_skills: [],
-    consent_lgpd: false,
+    is_authenticated: Boolean(loggedInCandidate),
+    first_name: loggedInCandidate?.first_name || '',
+    last_name: loggedInCandidate?.last_name || '',
+    email: loggedInCandidate?.email || '',
+    phone: loggedInCandidate?.phone || '',
+    city: loggedInCandidate?.city || '',
+    state: loggedInCandidate?.state || 'PA',
+    linkedin: loggedInCandidate?.linkedin || '',
+    interest_area: targetJob?.department_name || loggedInCandidate?.interest_area || '',
+    desired_role: targetJob?.title || loggedInCandidate?.desired_role || '',
+    desired_pay: loggedInCandidate?.desired_pay || '',
+    travel_availability: loggedInCandidate?.travel_availability || 'Total (Qualquer região)',
+    driver_license: loggedInCandidate?.driver_license || 'Não possui',
+    can_relocate: loggedInCandidate?.can_relocate ? '1' : '0',
+    educations: loggedInCandidate?.educations?.length
+      ? loggedInCandidate.educations
+      : [{ level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' }],
+    experiences: loggedInCandidate?.experiences?.length
+      ? loggedInCandidate.experiences
+      : [{ role: '', company: '', start_date: '', end_date: '', is_current: false, period: '', activities: '' }],
+    notes: loggedInCandidate?.notes || '',
+    key_skills: loggedInCandidate?.key_skills || [],
+    consent_lgpd: Boolean(loggedInCandidate),
     resume: null,
+    photo: null,
+    photo_url: loggedInCandidate?.photo_url || null,
+    photo_preview_url: null,
   }
 
   let currentStep = 1
   const totalSteps = 6
   const lookupDone = false
+  let showAlreadyRegisteredScreen = Boolean(loggedInCandidate && !targetJob)
 
   function render() {
+    if (showAlreadyRegisteredScreen && loggedInCandidate) {
+      appEl.innerHTML = `
+        <div style="background: var(--ael-surface); min-height: calc(100vh - 80px); padding-top: calc(var(--ael-header-h) + 2rem); padding-bottom: 5rem; display: flex; align-items: center;">
+          <div class="container" style="max-width: 680px; margin-inline: auto;">
+            <div class="data-card" style="padding: 3.5rem 2.5rem; text-align: center; border: 1.5px solid var(--ael-green-base); box-shadow: 0 10px 30px rgba(0, 91, 58, 0.08);">
+              <div style="
+                width: 72px; height: 72px; border-radius: 50%;
+                background: rgba(0, 230, 118, 0.15); color: var(--ael-green-dark);
+                display: flex; align-items: center; justify-content: center;
+                margin-inline: auto; margin-bottom: 1.5rem; font-size: 2.25rem; font-weight: 800;
+              ">✓</div>
+
+              <span class="badge badge-accent" style="margin-bottom: 1rem; font-size: 0.8125rem; padding: 0.35rem 0.875rem;">
+                Perfil Ativo no Banco de Talentos
+              </span>
+
+              <h1 style="font-size: clamp(1.6rem, 3vw, 2rem); font-weight: 800; color: var(--ael-ink); margin-bottom: 0.75rem; line-height: 1.25;">
+                Você já faz parte do Banco de Talentos oficial da A&L!
+              </h1>
+
+              <p style="color: var(--ael-text); font-size: 1rem; line-height: 1.6; margin-bottom: 2rem;">
+                Olá, <strong>${escHtml(loggedInCandidate.first_name)} ${escHtml(loggedInCandidate.last_name || '')}</strong>!<br>
+                Seu cadastro profissional está ativo com o e-mail <strong>${escHtml(loggedInCandidate.email)}</strong>. Nossa equipe de Recursos Humanos consulta continuamente essa base para novos projetos e oportunidades operacionais e de engenharia.
+              </p>
+
+              <div style="
+                background: rgba(0, 91, 58, 0.04);
+                border: 1px solid var(--ael-line);
+                border-radius: var(--ael-radius-lg);
+                padding: 1.25rem;
+                margin-bottom: 2rem;
+                text-align: left;
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                gap: 1rem;
+              ">
+                <div>
+                  <div style="font-size: 0.75rem; color: var(--ael-muted); font-weight: 600;">Área de Interesse</div>
+                  <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">${escHtml(loggedInCandidate.interest_area || 'Geral')}</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.75rem; color: var(--ael-muted); font-weight: 600;">Cargo Desejado</div>
+                  <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">${escHtml(loggedInCandidate.desired_role || 'Não especificado')}</div>
+                </div>
+                <div>
+                  <div style="font-size: 0.75rem; color: var(--ael-muted); font-weight: 600;">Localidade</div>
+                  <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">${escHtml([loggedInCandidate.city, loggedInCandidate.state].filter(Boolean).join(' - ') || 'Parauapebas - PA')}</div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                <a href="#/candidato" class="btn btn-primary btn-lg">
+                  👤 Acessar Meu Painel de Candidato
+                </a>
+                <a href="#/jobs" class="btn btn-outline btn-lg" id="btn-ver-vagas-cadastrado">
+                  ⚡ Ver Vagas Abertas
+                </a>
+              </div>
+
+              <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--ael-line); font-size: 0.8125rem; color: var(--ael-muted);">
+                Deseja revisar ou preencher o formulário passo a passo novamente? 
+                <button type="button" id="btn-show-full-form" style="background: none; border: none; color: var(--ael-green-base); font-weight: 700; text-decoration: underline; cursor: pointer; padding: 0;">
+                  Clique aqui para abrir o formulário
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+      document.getElementById('btn-show-full-form')?.addEventListener('click', () => {
+        showAlreadyRegisteredScreen = false
+        render()
+      })
+      return
+    }
+
     appEl.innerHTML = `
       <div style="background: var(--ael-surface); min-height: 100vh; padding-top: calc(var(--ael-header-h) + 2rem); padding-bottom: 5rem;">
         <div class="container" style="max-width: 780px; margin-inline: auto;">
@@ -139,6 +238,7 @@ export async function renderTalentPoolRegister(params, appEl) {
 
           <!-- PROGRESS BAR -->
           <div class="data-card" style="padding: 1.25rem 1.5rem; margin-bottom: 1.5rem;">
+
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
               <span style="font-size: 0.875rem; font-weight: 700; color: var(--ael-ink);">
                 Etapa ${currentStep} de ${totalSteps}: <span style="color: var(--ael-green-base);">${getStepTitle(currentStep)}</span>
@@ -234,10 +334,48 @@ export async function renderTalentPoolRegister(params, appEl) {
             1. Dados Pessoais & Informações de Contato
           </h3>
 
+          ${
+            data.is_authenticated
+              ? `
+            <div style="background: rgba(0, 91, 58, 0.08); border: 1.5px solid var(--ael-green-base); border-radius: var(--ael-radius-md); padding: 0.875rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;">
+              <div style="font-size: 1.25rem;">🔒</div>
+              <div>
+                <div style="font-weight: 700; color: var(--ael-green-dark); font-size: 0.875rem;">
+                  Você está conectado como ${escHtml(data.email)}
+                </div>
+                <div style="font-size: 0.75rem; color: var(--ael-muted); margin-top: 0.15rem;">
+                  Seus dados cadastrados foram carregados automaticamente do seu perfil ativo.
+                </div>
+              </div>
+            </div>
+          `
+              : ''
+          }
+
+          <!-- FOTO DE PERFIL (OPCIONAL) -->
+          <div style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; padding: 1rem 1.25rem; background: rgba(0, 91, 58, 0.04); border-radius: var(--ael-radius-md); border: 1px solid var(--ael-line);">
+            <div style="width: 60px; height: 60px; border-radius: 50%; overflow: hidden; border: 2px solid var(--ael-green-base); background: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0;" id="tp-photo-preview-wrap">
+              ${
+                data.photo_preview_url || data.photo_url
+                  ? `<img src="${data.photo_preview_url || data.photo_url}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover;" id="tp-photo-img" />`
+                  : `<span style="font-size: 1.5rem; color: var(--ael-muted);" id="tp-photo-placeholder">👤</span>`
+              }
+            </div>
+            <div style="flex: 1;">
+              <div style="font-weight: 700; font-size: 0.875rem; color: var(--ael-ink);">Foto de Perfil (Opcional)</div>
+              <div style="font-size: 0.75rem; color: var(--ael-muted); margin-bottom: 0.5rem;">Adicione uma foto para enriquecer seu currículo profissional (JPG, PNG ou WEBP).</div>
+              <label for="tp-photo-input" class="btn btn-sm btn-outline" style="cursor: pointer; display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span>📷 Selecionar Foto</span>
+              </label>
+              <input type="file" id="tp-photo-input" accept="image/png, image/jpeg, image/webp" style="display: none;" />
+            </div>
+          </div>
+
           <div class="form-group">
             <label class="form-label" for="tp-email">E-mail * <span style="font-weight:400;color:var(--ael-muted);">(se já tiver cadastro, carregaremos seus dados)</span></label>
             <input id="tp-email" name="email" type="email" class="form-control" placeholder="seu.email@exemplo.com" value="${escAttr(data.email)}" required />
           </div>
+
 
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div class="form-group">
@@ -283,6 +421,9 @@ export async function renderTalentPoolRegister(params, appEl) {
             </div>
           </div>
 
+          ${
+            !data.is_authenticated
+              ? `
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; background: rgba(0,91,58,0.04); border: 1px solid rgba(0,91,58,0.12); padding: 1rem; border-radius: var(--ael-radius-md); margin-top: 0.5rem;">
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label" for="tp-password" style="font-weight: 700; color: var(--ael-green-dark);">
@@ -316,6 +457,9 @@ export async function renderTalentPoolRegister(params, appEl) {
               />
             </div>
           </div>
+          `
+              : ''
+          }
         `
 
       case 2:
@@ -448,14 +592,14 @@ export async function renderTalentPoolRegister(params, appEl) {
                   </div>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1rem; margin-bottom: 0;">
+                <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 1rem; margin-bottom: 0;">
                   <div class="form-group" style="margin-bottom: 0;">
                     <label class="form-label">Instituição de Ensino / Faculdade</label>
                     <input type="text" class="form-control edu-institution" placeholder="Ex: SENAI, IFPA, UFPA, PUC, Estácio..." value="${escAttr(edu.institution)}" />
                   </div>
                   <div class="form-group" style="margin-bottom: 0;">
-                    <label class="form-label">Ano de Conclusão / Previsão</label>
-                    <input type="text" class="form-control edu-year" placeholder="Ex: 2022, 2025..." value="${escAttr(edu.year)}" />
+                    <label class="form-label">Ano de Conclusão / Previsão 📅</label>
+                    <input type="month" class="form-control edu-year" value="${escAttr(normalizeMonthForInput(edu.year))}" />
                   </div>
                 </div>
               </div>
@@ -488,8 +632,9 @@ export async function renderTalentPoolRegister(params, appEl) {
           <!-- LISTA DE EXPERIÊNCIAS -->
           <div id="experiences-container" style="display: flex; flex-direction: column; gap: 1.25rem;">
             ${data.experiences
-              .map(
-                (exp, idx) => `
+              .map((exp, idx) => {
+                const expDates = parsePeriodForInputs(exp.period, exp)
+                return `
               <div class="exp-card" data-idx="${idx}" style="
                 background: #ffffff;
                 border: 1.5px solid var(--ael-line);
@@ -523,9 +668,33 @@ export async function renderTalentPoolRegister(params, appEl) {
                   </div>
                 </div>
 
-                <div class="form-group">
-                  <label class="form-label">Período de Atuação</label>
-                  <input type="text" class="form-control exp-period" placeholder="Ex: Jan 2021 a Mar 2024 ou Jan 2023 até o momento" value="${escAttr(exp.period)}" />
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.75rem;">
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Mês/Ano de Início 📅</label>
+                    <input type="month" class="form-control exp-start" value="${escAttr(expDates.start_date)}" />
+                  </div>
+                  <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Mês/Ano de Saída 📅</label>
+                    <input
+                      type="month"
+                      class="form-control exp-end"
+                      value="${escAttr(expDates.end_date)}"
+                      ${expDates.is_current ? 'disabled style="opacity:0.5;background:var(--ael-line);"' : ''}
+                    />
+                  </div>
+                </div>
+
+                <div style="margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                  <input
+                    type="checkbox"
+                    class="exp-current-cb"
+                    id="tp-exp-curr-${idx}"
+                    ${expDates.is_current ? 'checked' : ''}
+                    style="width: 16px; height: 16px; accent-color: var(--ael-green-base); cursor: pointer;"
+                  />
+                  <label for="tp-exp-curr-${idx}" style="font-size: 0.8125rem; color: var(--ael-ink); font-weight: 600; cursor: pointer;">
+                    Trabalho atualmente nesta empresa (Emprego Atual)
+                  </label>
                 </div>
 
                 <div class="form-group" style="margin-bottom: 0;">
@@ -534,7 +703,7 @@ export async function renderTalentPoolRegister(params, appEl) {
                 </div>
               </div>
             `
-              )
+              })
               .join('')}
           </div>
         `
@@ -706,13 +875,16 @@ export async function renderTalentPoolRegister(params, appEl) {
 
       case 3: {
         const eduCards = document.querySelectorAll('.edu-card')
-        formData.educations = Array.from(eduCards).map((card) => ({
-          level: card.querySelector('.edu-level')?.value || 'Superior Completo',
-          course: card.querySelector('.edu-course')?.value || '',
-          institution: card.querySelector('.edu-institution')?.value || '',
-          year: card.querySelector('.edu-year')?.value || '',
-          status: 'Concluído',
-        }))
+        formData.educations = Array.from(eduCards).map((card) => {
+          const rawYear = card.querySelector('.edu-year')?.value || ''
+          return {
+            level: card.querySelector('.edu-level')?.value || 'Superior Completo',
+            course: card.querySelector('.edu-course')?.value || '',
+            institution: card.querySelector('.edu-institution')?.value || '',
+            year: formatMonthForDisplay(rawYear) || rawYear,
+            status: 'Concluído',
+          }
+        })
         if (!formData.educations.length) {
           formData.educations = [
             { level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' },
@@ -724,14 +896,28 @@ export async function renderTalentPoolRegister(params, appEl) {
       case 4: {
         formData.notes = document.getElementById('tp-notes')?.value || ''
         const expCards = document.querySelectorAll('.exp-card')
-        formData.experiences = Array.from(expCards).map((card) => ({
-          role: card.querySelector('.exp-role')?.value || '',
-          company: card.querySelector('.exp-company')?.value || '',
-          period: card.querySelector('.exp-period')?.value || '',
-          activities: card.querySelector('.exp-activities')?.value || '',
-        }))
+        formData.experiences = Array.from(expCards).map((card) => {
+          const role = card.querySelector('.exp-role')?.value || ''
+          const company = card.querySelector('.exp-company')?.value || ''
+          const startDate = card.querySelector('.exp-start')?.value || ''
+          const endDate = card.querySelector('.exp-end')?.value || ''
+          const isCurrent = card.querySelector('.exp-current-cb')?.checked || false
+          const period = buildPeriodFromInputs(startDate, endDate, isCurrent)
+          const activities = card.querySelector('.exp-activities')?.value || ''
+          return {
+            role,
+            company,
+            start_date: startDate,
+            end_date: endDate,
+            is_current: isCurrent,
+            period,
+            activities,
+          }
+        })
         if (!formData.experiences.length) {
-          formData.experiences = [{ role: '', company: '', period: '', activities: '' }]
+          formData.experiences = [
+            { role: '', company: '', start_date: '', end_date: '', is_current: false, period: '', activities: '' },
+          ]
         }
         break
       }
@@ -780,21 +966,23 @@ export async function renderTalentPoolRegister(params, appEl) {
           showToast({ title: 'Atenção', message: 'Informe sua cidade.', type: 'error' })
           return false
         }
-        if (!formData.password || formData.password.length < 8) {
-          showToast({
-            title: 'Senha Obrigatória',
-            message: 'Crie uma senha com no mínimo 8 caracteres para seu perfil.',
-            type: 'error',
-          })
-          return false
-        }
-        if (formData.password !== formData.password_confirm) {
-          showToast({
-            title: 'Senhas Diferentes',
-            message: 'A confirmação de senha não coincide com a senha criada.',
-            type: 'error',
-          })
-          return false
+        if (!formData.is_authenticated) {
+          if (!formData.password || formData.password.length < 8) {
+            showToast({
+              title: 'Senha Obrigatória',
+              message: 'Crie uma senha com no mínimo 8 caracteres para seu perfil.',
+              type: 'error',
+            })
+            return false
+          }
+          if (formData.password !== formData.password_confirm) {
+            showToast({
+              title: 'Senhas Diferentes',
+              message: 'A confirmação de senha não coincide com a senha criada.',
+              type: 'error',
+            })
+            return false
+          }
         }
         return true
 
@@ -875,6 +1063,39 @@ export async function renderTalentPoolRegister(params, appEl) {
       })
     })
 
+    // Upload e Preview de Foto de Perfil
+    document.getElementById('tp-photo-input')?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0]
+      if (file) {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+          showToast({
+            title: 'Formato Inválido',
+            message: 'Envie uma imagem em formato JPG, PNG ou WEBP.',
+            type: 'error',
+          })
+          return
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          showToast({
+            title: 'Arquivo Muito Grande',
+            message: 'A foto deve ter no máximo 5MB.',
+            type: 'error',
+          })
+          return
+        }
+        formData.photo = file
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          formData.photo_preview_url = ev.target.result
+          const wrap = document.getElementById('tp-photo-preview-wrap')
+          if (wrap) {
+            wrap.innerHTML = `<img src="${ev.target.result}" alt="Foto" style="width: 100%; height: 100%; object-fit: cover;" />`
+          }
+        }
+        reader.readAsDataURL(file)
+      }
+    })
+
     // Adicionar / Remover Experiências
     document.getElementById('add-experience-btn')?.addEventListener('click', () => {
       saveCurrentStepData()
@@ -924,6 +1145,25 @@ export async function renderTalentPoolRegister(params, appEl) {
       })
     })
 
+    // Toggle de checkbox "Emprego Atual"
+    document.querySelectorAll('.exp-current-cb').forEach((cb) => {
+      cb.addEventListener('change', (e) => {
+        const card = e.target.closest('.exp-card')
+        const endInput = card?.querySelector('.exp-end')
+        if (endInput) {
+          endInput.disabled = e.target.checked
+          if (e.target.checked) {
+            endInput.value = ''
+            endInput.style.opacity = '0.5'
+            endInput.style.background = 'var(--ael-line)'
+          } else {
+            endInput.style.opacity = '1'
+            endInput.style.background = ''
+          }
+        }
+      })
+    })
+
     // Submit final
     document.getElementById('talent-pool-form')?.addEventListener('submit', async (e) => {
       e.preventDefault()
@@ -940,25 +1180,26 @@ export async function renderTalentPoolRegister(params, appEl) {
       payload.append('phone', formData.phone)
       payload.append('city', formData.city)
       payload.append('state', formData.state)
-      payload.append('linkedin', formData.linkedin)
+      payload.append('address', formData.address)
       payload.append('interest_area', formData.interest_area)
       payload.append('desired_role', formData.desired_role)
-      payload.append('desired_pay', formData.desired_pay)
       payload.append('travel_availability', formData.travel_availability)
       payload.append('driver_license', formData.driver_license)
+      payload.append('desired_pay', formData.desired_pay)
       payload.append('can_relocate', formData.can_relocate)
-      payload.append('notes', formData.notes)
-      payload.append('key_skills', formData.key_skills.join(', '))
       payload.append('educations', JSON.stringify(formData.educations))
       payload.append('experiences', JSON.stringify(formData.experiences))
+      payload.append('notes', formData.notes)
+      payload.append('key_skills', (formData.key_skills || []).join(', '))
       payload.append('consent_lgpd', 'true')
+      payload.append('job_id', targetJobId || '')
 
-      if (formData.password) {
+      if (formData.password && !candidateData) {
         payload.append('password', formData.password)
       }
 
-      if (jobId) {
-        payload.append('job_id', jobId)
+      if (formData.photo) {
+        payload.append('photo', formData.photo)
       }
 
       if (formData.resume) {
@@ -1026,6 +1267,69 @@ export async function renderTalentPoolRegister(params, appEl) {
   }
 
   render()
+}
+
+function normalizeMonthForInput(str) {
+  if (!str) return ''
+  const s = String(str).trim()
+  // Pattern MM/YYYY (e.g. 12/2025)
+  const mmyyyy = s.match(/^(\d{1,2})\/(\d{4})$/)
+  if (mmyyyy) {
+    const mm = mmyyyy[1].padStart(2, '0')
+    const yyyy = mmyyyy[2]
+    return `${yyyy}-${mm}`
+  }
+  // Pattern YYYY-MM
+  if (/^\d{4}-\d{2}$/.test(s)) return s
+  // Pattern YYYY (e.g. 2025)
+  if (/^\d{4}$/.test(s)) return `${s}-12`
+  return ''
+}
+
+function formatMonthForDisplay(str) {
+  if (!str) return ''
+  const s = String(str).trim()
+  // Pattern YYYY-MM
+  const yyyymm = s.match(/^(\d{4})-(\d{2})$/)
+  if (yyyymm) {
+    return `${yyyymm[2]}/${yyyymm[1]}`
+  }
+  return s
+}
+
+function parsePeriodForInputs(periodStr, expObj = {}) {
+  if (expObj.start_date || expObj.end_date || expObj.is_current !== undefined) {
+    return {
+      start_date: normalizeMonthForInput(expObj.start_date),
+      end_date: normalizeMonthForInput(expObj.end_date),
+      is_current: Boolean(expObj.is_current || !expObj.end_date),
+    }
+  }
+
+  const p = String(periodStr || '').trim()
+  const isCurrent = /momento|atual|presente|hoje/i.test(p)
+
+  // Extrai meses/anos do texto
+  const months = p.match(/\b\d{1,2}\/\d{4}\b|\b\d{4}-\d{2}\b|\b\d{4}\b/g) || []
+  const start_date = months[0] ? normalizeMonthForInput(months[0]) : ''
+  const end_date = !isCurrent && months[1] ? normalizeMonthForInput(months[1]) : ''
+
+  return {
+    start_date,
+    end_date,
+    is_current: isCurrent || (!end_date && Boolean(start_date)),
+  }
+}
+
+function buildPeriodFromInputs(startMonth, endMonth, isCurrent) {
+  const startFmt = formatMonthForDisplay(startMonth)
+  const endFmt = formatMonthForDisplay(endMonth)
+
+  if (!startFmt && !endFmt) return ''
+  if (isCurrent || !endFmt) {
+    return startFmt ? `${startFmt} até o momento` : 'Até o momento'
+  }
+  return `${startFmt} a ${endFmt}`
 }
 
 function escHtml(s) {

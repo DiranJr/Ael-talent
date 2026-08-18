@@ -16,6 +16,8 @@ import {
   getCandidateExtraFields,
   STATUS_MAP,
   saveCandidateAttachment,
+  saveCandidateExtraField,
+  saveCandidatePhoto,
   sendError,
   sendSuccess,
 } from '../helpers.js'
@@ -54,7 +56,7 @@ async function getFormattedCandidate(db, candidateId) {
   )
 
   const [attachments] = await db.query(
-    `SELECT attachment_id, original_filename, file_size_kb, date_created
+    `SELECT attachment_id, title, original_filename, stored_filename, content_type, file_size_kb, date_created
      FROM attachment
      WHERE data_item_type = 100 AND data_item_id = ?
      ORDER BY date_created DESC`,
@@ -434,92 +436,118 @@ router.get('/me', candidateAuth, async (req, res) => {
 // ============================================================================
 // 7. CADASTRO / ATUALIZAÇÃO NO BANCO DE TALENTOS & CANDIDATURA DIRETA
 // ============================================================================
-router.post('/register', registrationLimiter, upload.single('resume'), async (req, res) => {
-  const db = await getDb()
-  const conn = await db.getConnection()
+router.post(
+  '/register',
+  registrationLimiter,
+  upload.fields([
+    { name: 'resume', maxCount: 1 },
+    { name: 'photo', maxCount: 1 },
+  ]),
+  async (req, res) => {
+    const db = await getDb()
+    const conn = await db.getConnection()
 
-  try {
-    await conn.beginTransaction()
+    try {
+      await conn.beginTransaction()
 
-    const {
-      first_name,
-      last_name,
-      email,
-      phone,
-      password,
-      city,
-      state,
-      linkedin,
-      interest_area,
-      desired_role,
-      travel_availability,
-      driver_license,
-      can_relocate,
-      desired_pay,
-      experience_years,
-      notes,
-      key_skills,
-      consent_lgpd,
-      job_id,
-    } = req.body
+      const {
+        first_name,
+        last_name,
+        email,
+        phone,
+        password,
+        city,
+        state,
+        linkedin,
+        interest_area,
+        desired_role,
+        travel_availability,
+        driver_license,
+        can_relocate,
+        desired_pay,
+        experience_years,
+        notes,
+        key_skills,
+        consent_lgpd,
+        job_id,
+      } = req.body
 
-    // Parse e Sanitização de Formações e Experiências
-    let educationsList = []
-    if (req.body.educations) {
-      try {
-        const raw = typeof req.body.educations === 'string' ? JSON.parse(req.body.educations) : req.body.educations
-        if (Array.isArray(raw)) {
-          educationsList = raw.slice(0, 20)
+      const resumeFile = req.files?.resume?.[0] || req.file || null
+      const photoFile = req.files?.photo?.[0] || null
+
+      if (resumeFile) {
+        const v = await validateUploadedFile(resumeFile.path, resumeFile.originalname)
+        if (!v.valid) {
+          await conn.rollback()
+          return sendError(res, v.error || 'Arquivo de currículo inválido.', 400)
         }
-      } catch (e) {
-        console.warn('Erro ao parsear educations:', e.message)
       }
-    }
 
-    let experiencesList = []
-    if (req.body.experiences) {
-      try {
-        const raw = typeof req.body.experiences === 'string' ? JSON.parse(req.body.experiences) : req.body.experiences
-        if (Array.isArray(raw)) {
-          experiencesList = raw.slice(0, 20)
+      if (photoFile) {
+        const v = await validateUploadedFile(photoFile.path, photoFile.originalname)
+        if (!v.valid) {
+          await conn.rollback()
+          return sendError(res, v.error || 'Arquivo de foto inválido.', 400)
         }
-      } catch (e) {
-        console.warn('Erro ao parsear experiences:', e.message)
       }
-    }
 
-    // Validações obrigatórias
-    if (!first_name?.trim() || !last_name?.trim() || !email?.trim() || !phone?.trim()) {
-      await conn.rollback()
-      return sendError(res, 'Preencha os campos obrigatórios: Nome, Sobrenome, E-mail e WhatsApp/Telefone.', 400)
-    }
+      // Parse e Sanitização de Formações e Experiências
+      let educationsList = []
+      if (req.body.educations) {
+        try {
+          const raw = typeof req.body.educations === 'string' ? JSON.parse(req.body.educations) : req.body.educations
+          if (Array.isArray(raw)) {
+            educationsList = raw.slice(0, 20)
+          }
+        } catch (e) {
+          console.warn('Erro ao parsear educations:', e.message)
+        }
+      }
 
-    const cleanEmail = email.trim().toLowerCase()
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-      await conn.rollback()
-      return sendError(res, 'E-mail inválido.', 400)
-    }
+      let experiencesList = []
+      if (req.body.experiences) {
+        try {
+          const raw = typeof req.body.experiences === 'string' ? JSON.parse(req.body.experiences) : req.body.experiences
+          if (Array.isArray(raw)) {
+            experiencesList = raw.slice(0, 20)
+          }
+        } catch (e) {
+          console.warn('Erro ao parsear experiences:', e.message)
+        }
+      }
 
-    const cleanPhone = phone.trim()
-    const cleanFirst = first_name.trim()
-    const cleanLast = last_name.trim()
+      // Validações obrigatórias
+      if (!first_name?.trim() || !last_name?.trim() || !email?.trim() || !phone?.trim()) {
+        await conn.rollback()
+        return sendError(res, 'Preencha os campos obrigatórios: Nome, Sobrenome, E-mail e WhatsApp/Telefone.', 400)
+      }
 
-    // 1. DEDUPLICAÇÃO NATIVA
-    const [existing] = await conn.query(
-      'SELECT candidate_id, source FROM candidate WHERE email1 = ? OR email2 = ? LIMIT 1',
-      [cleanEmail, cleanEmail]
-    )
+      const cleanEmail = email.trim().toLowerCase()
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+        await conn.rollback()
+        return sendError(res, 'E-mail inválido.', 400)
+      }
 
-    let candidateId
-    let isNew = false
+      const cleanPhone = phone.trim()
+      const cleanFirst = first_name.trim()
+      const cleanLast = last_name.trim()
 
-    const mainEmployer = experiencesList[0]?.company || req.body.current_employer || ''
-    const mainRole = experiencesList[0]?.role || req.body.last_role || desired_role || ''
+      // 1. DEDUPLICAÇÃO NATIVA
+      const [existing] = await conn.query(
+        'SELECT candidate_id, source FROM candidate WHERE email1 = ? OR email2 = ? LIMIT 1',
+        [cleanEmail, cleanEmail]
+      )
 
-    if (existing.length > 0) {
-      candidateId = existing[0].candidate_id
-      await conn.query(
-        `UPDATE candidate SET
+      let candidateId
+      let isNew = false
+
+      const mainEmployer = experiencesList[0]?.company || req.body.current_employer || ''
+      const mainRole = experiencesList[0]?.role || req.body.last_role || desired_role || ''
+
+      if (existing.length > 0) {
+        candidateId = existing[0].candidate_id
+        await conn.query(
+          `UPDATE candidate SET
           first_name = ?,
           last_name = ?,
           phone_cell = ?,
@@ -533,187 +561,217 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
           key_skills = COALESCE(NULLIF(?, ''), key_skills),
           date_modified = NOW()
         WHERE candidate_id = ?`,
-        [
-          cleanFirst,
-          cleanLast,
-          cleanPhone,
-          city?.trim() || null,
-          state?.trim()?.toUpperCase() || null,
-          linkedin?.trim() || null,
-          mainEmployer.trim(),
-          desired_pay?.trim() || '',
-          can_relocate === '1' || can_relocate === true || can_relocate === 'true' ? 1 : 0,
-          notes?.trim() || '',
-          Array.isArray(key_skills) ? key_skills.join(', ') : key_skills?.trim() || '',
-          candidateId,
-        ]
-      )
-    } else {
-      isNew = true
-      const [insertRes] = await conn.query(
-        `INSERT INTO candidate (
+          [
+            cleanFirst,
+            cleanLast,
+            cleanPhone,
+            city?.trim() || null,
+            state?.trim()?.toUpperCase() || null,
+            linkedin?.trim() || null,
+            mainEmployer.trim(),
+            desired_pay?.trim() || '',
+            can_relocate === '1' || can_relocate === true || can_relocate === 'true' ? 1 : 0,
+            notes?.trim() || '',
+            Array.isArray(key_skills) ? key_skills.join(', ') : key_skills?.trim() || '',
+            candidateId,
+          ]
+        )
+      } else {
+        isNew = true
+        const [insertRes] = await conn.query(
+          `INSERT INTO candidate (
           first_name, last_name, email1, phone_cell,
           city, state, web_site, current_employer,
           desired_pay, can_relocate, notes, key_skills,
           source, is_active, date_created, date_modified, entered_by
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Banco de Talentos A&L', 1, NOW(), NOW(), 0)`,
-        [
-          cleanFirst,
-          cleanLast,
-          cleanEmail,
-          cleanPhone,
-          city?.trim() || 'Parauapebas',
-          state?.trim()?.toUpperCase() || 'PA',
-          linkedin?.trim() || null,
-          mainEmployer.trim() || null,
-          desired_pay?.trim() || null,
-          can_relocate === '1' || can_relocate === true || can_relocate === 'true' ? 1 : 0,
-          notes?.trim() || null,
-          Array.isArray(key_skills) ? key_skills.join(', ') : key_skills?.trim() || null,
-        ]
-      )
-      candidateId = insertRes.insertId
-    }
-
-    // 2. EXTRA FIELDS
-    const primaryEducation = educationsList[0] || {}
-    const extraFieldsMap = {
-      'Area de Interesse': interest_area?.trim() || null,
-      'Cargo Desejado': desired_role?.trim() || null,
-      'Disponibilidade para Viagens': travel_availability?.trim() || null,
-      CNH: driver_license?.trim() || null,
-      Escolaridade: primaryEducation.level || req.body.education_level || null,
-      Curso: primaryEducation.course || req.body.course || null,
-      'Instituicao de Ensino': primaryEducation.institution || req.body.institution || null,
-      'Ano de Conclusao': primaryEducation.year || req.body.graduation_year || null,
-      'Tempo de Experiencia': experience_years?.trim() || null,
-      'Ultimo Cargo': mainRole.trim() || null,
-      'Formacao Academica': educationsList.length ? JSON.stringify(educationsList) : null,
-      'Historico Profissional': experiencesList.length ? JSON.stringify(experiencesList) : null,
-      'Consentimento LGPD': consent_lgpd
-        ? `Autorizado em ${new Date().toLocaleString('pt-BR')} (IP: ${req.ip || '127.0.0.1'})`
-        : null,
-    }
-
-    for (const [fieldName, val] of Object.entries(extraFieldsMap)) {
-      if (val !== null && val !== undefined && val !== '') {
-        await conn.query('DELETE FROM extra_field WHERE data_item_id = ? AND data_item_type = 100 AND field_name = ?', [
-          candidateId,
-          fieldName,
-        ])
-        await conn.query(
-          'INSERT INTO extra_field (data_item_id, field_name, value, import_id, data_item_type) VALUES (?, ?, ?, 0, 100)',
-          [candidateId, fieldName, String(val)]
+          [
+            cleanFirst,
+            cleanLast,
+            cleanEmail,
+            cleanPhone,
+            city?.trim() || 'Parauapebas',
+            state?.trim()?.toUpperCase() || 'PA',
+            linkedin?.trim() || null,
+            mainEmployer.trim() || null,
+            desired_pay?.trim() || null,
+            can_relocate === '1' || can_relocate === true || can_relocate === 'true' ? 1 : 0,
+            notes?.trim() || null,
+            Array.isArray(key_skills) ? key_skills.join(', ') : key_skills?.trim() || null,
+          ]
         )
+        candidateId = insertRes.insertId
       }
-    }
 
-    // Validação de arquivo de upload enviado
-    if (req.file) {
-      const validation = await validateUploadedFile(req.file.path, req.file.originalname)
-      if (!validation.valid) {
-        await conn.rollback()
-        return sendError(res, validation.error || 'Arquivo de currículo inválido.', 400)
+      // 2. EXTRA FIELDS
+      const primaryEducation = educationsList[0] || {}
+      const extraFieldsMap = {
+        'Area de Interesse': interest_area?.trim() || null,
+        'Cargo Desejado': desired_role?.trim() || null,
+        'Disponibilidade para Viagens': travel_availability?.trim() || null,
+        CNH: driver_license?.trim() || null,
+        Escolaridade: primaryEducation.level || req.body.education_level || null,
+        Curso: primaryEducation.course || req.body.course || null,
+        'Instituicao de Ensino': primaryEducation.institution || req.body.institution || null,
+        'Ano de Conclusao': primaryEducation.year || req.body.graduation_year || null,
+        'Tempo de Experiencia': experience_years?.trim() || null,
+        'Ultimo Cargo': mainRole.trim() || null,
+        'Formacao Academica': educationsList.length ? JSON.stringify(educationsList) : null,
+        'Historico Profissional': experiencesList.length ? JSON.stringify(experiencesList) : null,
+        'Consentimento LGPD': consent_lgpd
+          ? `Autorizado em ${new Date().toLocaleString('pt-BR')} (IP: ${req.ip || '127.0.0.1'})`
+          : null,
       }
-    }
 
-    // 3. CANDIDATE_AUTH (Grava senha exclusivamente no cadastro de NOVO candidato)
-    // Bloqueia qualquer alteração de senha de candidatos pré-existentes via /register
-    if (isNew && password && password.trim().length >= 8) {
-      const pwdPolicy = validatePasswordPolicy(password.trim())
-      if (pwdPolicy.valid) {
-        const newHash = hashPassword(password.trim())
-        await conn.query(
-          `INSERT INTO candidate_auth (candidate_id, password_hash, failed_attempts, created_at, updated_at)
-           VALUES (?, ?, 0, NOW(), NOW())`,
-          [candidateId, newHash]
-        )
-      }
-    }
-
-    // 4. ANEXO DE CURRÍCULO
-    let attachmentId = null
-    if (req.file) {
-      attachmentId = await saveCandidateAttachment(conn, candidateId, req.file)
-    }
-
-    // 5. SE `job_id` INFORMADO, VINCULA AO PIPELINE DA VAGA
-    let appliedJobTitle = null
-    if (job_id) {
-      const jobId = parseInt(job_id)
-      if (jobId) {
-        const [jobCheck] = await conn.query('SELECT title FROM joborder WHERE joborder_id = ?', [jobId])
-        if (jobCheck.length > 0) {
-          appliedJobTitle = jobCheck[0].title
-
-          const [existsInJob] = await conn.query(
-            'SELECT candidate_joborder_id FROM candidate_joborder WHERE candidate_id = ? AND joborder_id = ?',
-            [candidateId, jobId]
+      for (const [fieldName, val] of Object.entries(extraFieldsMap)) {
+        if (val !== null && val !== undefined && val !== '') {
+          await conn.query(
+            'DELETE FROM extra_field WHERE data_item_id = ? AND data_item_type = 100 AND field_name = ?',
+            [candidateId, fieldName]
           )
+          await conn.query(
+            'INSERT INTO extra_field (data_item_id, field_name, value, import_id, data_item_type) VALUES (?, ?, ?, 0, 100)',
+            [candidateId, fieldName, String(val)]
+          )
+        }
+      }
 
-          if (existsInJob.length === 0) {
-            await conn.query(
-              `INSERT INTO candidate_joborder (
+      // Validação de arquivo de upload enviado
+      if (req.file) {
+        const validation = await validateUploadedFile(req.file.path, req.file.originalname)
+        if (!validation.valid) {
+          await conn.rollback()
+          return sendError(res, validation.error || 'Arquivo de currículo inválido.', 400)
+        }
+      }
+
+      // 3. CANDIDATE_AUTH (Grava senha exclusivamente no cadastro de NOVO candidato)
+      // Bloqueia qualquer alteração de senha de candidatos pré-existentes via /register
+      if (isNew && password && password.trim().length >= 8) {
+        const pwdPolicy = validatePasswordPolicy(password.trim())
+        if (pwdPolicy.valid) {
+          const newHash = hashPassword(password.trim())
+          await conn.query(
+            `INSERT INTO candidate_auth (candidate_id, password_hash, failed_attempts, created_at, updated_at)
+           VALUES (?, ?, 0, NOW(), NOW())`,
+            [candidateId, newHash]
+          )
+        }
+      }
+
+      // 4. ANEXO DE CURRÍCULO E FOTO DE PERFIL
+      let attachmentId = null
+      if (resumeFile) {
+        attachmentId = await saveCandidateAttachment(conn, candidateId, resumeFile)
+      }
+      let photoAttachmentId = null
+      if (photoFile) {
+        photoAttachmentId = await saveCandidatePhoto(conn, candidateId, photoFile)
+      }
+
+      // 5. SE `job_id` INFORMADO, VINCULA AO PIPELINE DA VAGA
+      let appliedJobTitle = null
+      if (job_id) {
+        const jobId = parseInt(job_id)
+        if (jobId) {
+          const [jobCheck] = await conn.query('SELECT title FROM joborder WHERE joborder_id = ?', [jobId])
+          if (jobCheck.length > 0) {
+            appliedJobTitle = jobCheck[0].title
+
+            const [existsInJob] = await conn.query(
+              'SELECT candidate_joborder_id FROM candidate_joborder WHERE candidate_id = ? AND joborder_id = ?',
+              [candidateId, jobId]
+            )
+
+            if (existsInJob.length === 0) {
+              await conn.query(
+                `INSERT INTO candidate_joborder (
                 candidate_id, joborder_id, status, added_by, date_created, date_modified
               ) VALUES (?, ?, 100, 0, NOW(), NOW())`,
-              [candidateId, jobId]
-            )
+                [candidateId, jobId]
+              )
 
-            await conn.query(
-              `INSERT INTO candidate_joborder_status_history (
+              await conn.query(
+                `INSERT INTO candidate_joborder_status_history (
                 candidate_id, joborder_id, date, status_from, status_to
               ) VALUES (?, ?, NOW(), 0, 100)`,
-              [candidateId, jobId]
-            )
+                [candidateId, jobId]
+              )
+            }
           }
         }
       }
-    }
 
-    // 6. REGISTRO DE ATIVIDADE
-    const activityNote = appliedJobTitle
-      ? `Candidatura enviada para a vaga "${appliedJobTitle}" e perfil registrado no Banco de Talentos.`
-      : isNew
-        ? `Cadastro realizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`
-        : `Perfil atualizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`
+      // 6. REGISTRO DE ATIVIDADE
+      const activityNote = appliedJobTitle
+        ? `Candidatura enviada para a vaga "${appliedJobTitle}" e perfil registrado no Banco de Talentos.`
+        : isNew
+          ? `Cadastro realizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`
+          : `Perfil atualizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`
 
-    await conn.query(
-      `INSERT INTO activity (
+      await conn.query(
+        `INSERT INTO activity (
         data_item_id, data_item_type, type, notes, date_created, entered_by
       ) VALUES (?, 100, 400, ?, NOW(), 0)`,
-      [candidateId, activityNote]
-    )
+        [candidateId, activityNote]
+      )
 
-    await conn.commit()
+      await conn.commit()
 
-    const token = signCandidateToken({
-      candidate_id: candidateId,
-      email: cleanEmail,
-      name: `${cleanFirst} ${cleanLast}`,
-    })
-
-    return sendSuccess(
-      res,
-      {
-        isNew,
-        token,
+      const token = signCandidateToken({
         candidate_id: candidateId,
-        attachment_id: attachmentId,
-        job_title: appliedJobTitle,
-      },
-      appliedJobTitle
-        ? `Candidatura para a vaga "${appliedJobTitle}" realizada com sucesso!`
-        : isNew
-          ? 'Cadastro realizado com sucesso no Banco de Talentos da A&L Engenharia!'
-          : 'Perfil atualizado com sucesso no Banco de Talentos!',
-      200
-    )
+        email: cleanEmail,
+        name: `${cleanFirst} ${cleanLast}`,
+      })
+
+      return sendSuccess(
+        res,
+        {
+          isNew,
+          token,
+          candidate_id: candidateId,
+          attachment_id: attachmentId,
+          photo_attachment_id: photoAttachmentId,
+          job_title: appliedJobTitle,
+        },
+        appliedJobTitle
+          ? `Candidatura para a vaga "${appliedJobTitle}" realizada com sucesso!`
+          : isNew
+            ? 'Cadastro realizado com sucesso no Banco de Talentos da A&L Engenharia!'
+            : 'Perfil atualizado com sucesso no Banco de Talentos!',
+        200
+      )
+    } catch (err) {
+      await conn.rollback()
+      console.error('Erro no cadastro do Banco de Talentos:', err)
+      return sendError(res, 'Erro interno ao processar cadastro.', 500)
+    } finally {
+      conn.release()
+    }
+  }
+)
+
+// ============================================================================
+// UPLOAD EXCLUSIVO DE FOTO DE PERFIL (PORTAL DO CANDIDATO)
+// ============================================================================
+router.post('/photo', candidateAuth, upload.single('photo'), async (req, res) => {
+  if (!req.file) {
+    return sendError(res, 'Nenhuma imagem foi enviada.', 400)
+  }
+
+  const v = await validateUploadedFile(req.file.path, req.file.originalname)
+  if (!v.valid) {
+    return sendError(res, v.error || 'Arquivo de foto inválido.', 400)
+  }
+
+  const db = await getDb()
+  try {
+    const photoId = await saveCandidatePhoto(db, req.candidate.candidate_id, req.file)
+    const photo_url = `/api/attachments/${photoId}/download`
+    return sendSuccess(res, { photo_id: photoId, photo_url }, 'Foto de perfil atualizada com sucesso!')
   } catch (err) {
-    await conn.rollback()
-    console.error('Erro no cadastro do Banco de Talentos:', err)
-    return sendError(res, 'Erro interno ao processar cadastro.', 500)
-  } finally {
-    conn.release()
+    console.error('Erro ao salvar foto de perfil:', err)
+    return sendError(res, 'Erro ao salvar foto de perfil.', 500)
   }
 })
 
@@ -823,6 +881,7 @@ router.get('/candidates', adminAuth, async (req, res) => {
         c.date_modified,
         a.attachment_id,
         a.original_filename,
+        photo_att.photo_attachment_id,
         (
           SELECT GROUP_CONCAT(DISTINCT j.title SEPARATOR ', ')
           FROM candidate_joborder cj
@@ -841,6 +900,12 @@ router.get('/candidates', adminAuth, async (req, res) => {
         WHERE data_item_type = 100 AND resume = 1
         GROUP BY data_item_id
       ) a ON a.data_item_id = c.candidate_id
+      LEFT JOIN (
+        SELECT data_item_id, MAX(attachment_id) as photo_attachment_id
+        FROM attachment
+        WHERE data_item_type = 100 AND (title = 'Foto de Perfil' OR content_type LIKE 'image/%')
+        GROUP BY data_item_id
+      ) photo_att ON photo_att.data_item_id = c.candidate_id
       ${whereSql}
       ORDER BY c.date_created DESC
       LIMIT ? OFFSET ?
@@ -906,8 +971,11 @@ router.get('/candidates', adminAuth, async (req, res) => {
         source: c.source,
         date_created: c.date_created,
         attachment_id: c.attachment_id,
+        photo_attachment_id: c.photo_attachment_id || null,
+        photo_url: c.photo_attachment_id ? `/api/attachments/${c.photo_attachment_id}/download` : null,
         applied_jobs_titles: c.applied_jobs_titles,
         total_applications: c.total_applications || 0,
+
         interest_area: extras['Area de Interesse'] || null,
         desired_role: extras['Cargo Desejado'] || null,
         travel_availability: extras['Disponibilidade para Viagens'] || null,

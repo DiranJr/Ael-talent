@@ -209,14 +209,28 @@ function renderCandidatesRows(candidates) {
       return `
       <tr data-id="${c.candidate_id}">
         <td>
-          <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">
-            ${escHtml(c.full_name)}
-          </div>
-          <div style="font-size: 0.75rem; color: var(--ael-muted);">
-            Cadastrado em ${formatDate(c.date_created)}
-            ${c.total_applications > 0 ? `· <strong style="color:var(--ael-green-base);">${c.total_applications} vaga(s)</strong>` : ''}
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 42px; height: 42px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 1.5px solid var(--ael-line); background: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.04);">
+              ${
+                c.photo_url
+                  ? `<img src="${c.photo_url}" alt="${escAttr(c.full_name)}" style="width: 100%; height: 100%; object-fit: cover;" />`
+                  : `<div style="width: 100%; height: 100%; background: rgba(0, 91, 58, 0.12); color: var(--ael-green-dark); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9375rem;">
+                      ${(c.first_name || 'C').charAt(0).toUpperCase()}
+                    </div>`
+              }
+            </div>
+            <div>
+              <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">
+                ${escHtml(c.full_name)}
+              </div>
+              <div style="font-size: 0.75rem; color: var(--ael-muted);">
+                Cadastrado em ${formatDate(c.date_created)}
+                ${c.total_applications > 0 ? `· <strong style="color:var(--ael-green-base);">${c.total_applications} vaga(s)</strong>` : ''}
+              </div>
+            </div>
           </div>
         </td>
+
 
         <td>
           <span class="badge badge-green" style="margin-bottom: 0.25rem; display: inline-block;">
@@ -451,18 +465,42 @@ function renderCandidateDetailHtml(c) {
       : []
 
   return `
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
-      <div>
-        <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">E-mail & Telefone</span>
-        <strong>${escHtml(c.email1 || c.email)}</strong><br>
-        <span>${escHtml(c.phone_cell || c.phone || 'Sem telefone')}</span>
+    <!-- HEADER CANDIDATO COM FOTO -->
+    <div style="display: flex; align-items: center; gap: 1.25rem; margin-bottom: 1.5rem; padding: 1.25rem; background: rgba(0, 91, 58, 0.04); border-radius: var(--ael-radius-lg); border: 1px solid var(--ael-line);">
+      <div style="width: 68px; height: 68px; border-radius: 50%; overflow: hidden; flex-shrink: 0; border: 2.5px solid var(--ael-green-base); background: #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+        ${
+          c.photo_url
+            ? `<img src="${c.photo_url}" alt="${escAttr(c.full_name)}" style="width: 100%; height: 100%; object-fit: cover;" />`
+            : `<div style="width: 100%; height: 100%; background: var(--ael-green-base); color: #ffffff; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.5rem;">
+                ${(c.first_name || 'C').charAt(0).toUpperCase()}
+              </div>`
+        }
       </div>
       <div>
-        <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">Localização & Disponibilidade</span>
-        <strong>${escHtml(c.city || 'Não informada')} - ${escHtml(c.state || 'PA')}</strong><br>
-        <span>Mudança: ${c.can_relocate ? 'Sim' : 'Não'} · Viagens: ${escHtml(ex['Disponibilidade para Viagens'] || 'Não informado')}</span>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--ael-ink); margin: 0;">
+          ${escHtml(c.full_name)}
+        </h2>
+        <div style="font-size: 0.8125rem; color: var(--ael-muted); margin-top: 0.25rem;">
+          ${escHtml(c.email1 || c.email)} · ${escHtml(c.phone_cell || c.phone || 'Sem telefone')}
+        </div>
+        <div style="font-size: 0.8125rem; color: var(--ael-ink); font-weight: 600; margin-top: 0.25rem;">
+          📍 ${escHtml(c.city || 'Não informada')} - ${escHtml(c.state || 'PA')}
+        </div>
       </div>
     </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
+      <div>
+        <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">Disponibilidade</span>
+        <span>Mudança: <strong>${c.can_relocate ? 'Sim' : 'Não'}</strong></span><br>
+        <span>Viagens: <strong>${escHtml(ex['Disponibilidade para Viagens'] || 'Não informado')}</strong></span>
+      </div>
+      <div>
+        <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">Pretensão Salarial</span>
+        <span>${c.desired_pay ? `R$ ${Number(c.desired_pay).toLocaleString('pt-BR')}` : 'A combinar'}</span>
+      </div>
+    </div>
+
 
     ${
       mainAttachmentId

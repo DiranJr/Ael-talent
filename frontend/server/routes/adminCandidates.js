@@ -68,13 +68,20 @@ export async function adminGetCandidatesHandler(req, res) {
         COALESCE(cd.name, '') AS department_name,
         att.attachment_id,
         att.original_filename,
-        att.file_size_kb
+        att.file_size_kb,
+        photo_att.photo_attachment_id
       FROM candidate_joborder cj
       JOIN candidate c ON cj.candidate_id = c.candidate_id
       JOIN joborder jo ON cj.joborder_id = jo.joborder_id
       LEFT JOIN user u_rec ON jo.recruiter = u_rec.user_id
       LEFT JOIN company_department cd ON jo.company_department_id = cd.company_department_id
       LEFT JOIN attachment att ON att.data_item_id = c.candidate_id AND att.data_item_type = 100 AND att.resume = 1
+      LEFT JOIN (
+        SELECT data_item_id, MAX(attachment_id) as photo_attachment_id
+        FROM attachment
+        WHERE data_item_type = 100 AND (title = 'Foto de Perfil' OR content_type LIKE 'image/%')
+        GROUP BY data_item_id
+      ) photo_att ON photo_att.data_item_id = c.candidate_id
       ${where}
       ORDER BY cj.date_modified DESC, cj.date_created DESC
     `
@@ -86,6 +93,7 @@ export async function adminGetCandidatesHandler(req, res) {
       full_name: `${c.first_name} ${c.last_name}`.trim(),
       status_info: STATUS_MAP[c.status_code] || { label: `Status ${c.status_code}`, color: 'gray' },
       whatsapp_link: formatWhatsAppUrl(c.phone, c.first_name),
+      photo_url: c.photo_attachment_id ? `/api/attachments/${c.photo_attachment_id}/download` : null,
     }))
 
     return res.json({
