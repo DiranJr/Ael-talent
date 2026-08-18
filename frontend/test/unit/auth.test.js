@@ -94,11 +94,14 @@ describe('Auth Tokens (Candidate & Admin)', () => {
     expect(verifyCandidateToken('token_totalmente_invalido')).toBeNull()
   })
 
-  it('deve gerar e hashear reset token com SHA-256', () => {
-    const { token, tokenHash, expiresAt } = generateResetToken()
-    expect(token.length).toBe(64) // 32 bytes hex
+  it('deve gerar e hashear código de recuperação de 6 dígitos com SHA-256', () => {
+    const { code, token, tokenHash, expiresAt } = generateResetToken()
+    expect(code.length).toBe(6) // 6 dígitos numéricos
+    expect(/^\d{6}$/.test(code)).toBe(true)
+    expect(token).toBe(code)
     expect(tokenHash.length).toBe(64) // SHA-256 hex
-    expect(hashResetToken(token)).toBe(tokenHash)
+    expect(hashResetToken(code)).toBe(tokenHash)
     expect(expiresAt.getTime()).toBeGreaterThan(Date.now())
   })
 })
+

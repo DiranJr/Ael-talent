@@ -177,25 +177,28 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
           ">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
           </div>
-          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Redefinir Nova Senha</h2>
+          <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Validar Código de 6 Dígitos</h2>
           <p style="font-size: 0.875rem; color: var(--ael-muted); margin-top: 0.25rem;">
-            Informe o token de recuperação e crie sua nova senha segura.
+            Enviamos um código de verificação para o seu e-mail. Digite-o abaixo junto com sua nova senha.
           </p>
         </div>
 
         <form id="candidate-reset-form">
           <div class="form-group">
-            <label class="form-label" for="reset-token-input">Código / Token de Recuperação *</label>
+            <label class="form-label" for="reset-token-input" style="text-align: center; display: block;">Código de Verificação (6 dígitos) *</label>
             <input
               id="reset-token-input"
               type="text"
               class="form-control"
-              placeholder="Cole o token recebido"
-              value="${escAttr(resetToken)}"
+              placeholder="Ex: 123456"
+              maxlength="6"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              style="font-size: 1.35rem; font-weight: 800; letter-spacing: 0.35rem; text-align: center; color: var(--ael-green-base);"
               required
             />
-            <small style="font-size: 0.75rem; color: var(--ael-muted); margin-top: 0.25rem; display: block;">
-              Válido por 15 minutos a partir da solicitação.
+            <small style="font-size: 0.75rem; color: var(--ael-muted); margin-top: 0.35rem; display: block; text-align: center;">
+              Verifique sua caixa de entrada e spam (válido por 15 minutos).
             </small>
           </div>
 
@@ -240,7 +243,7 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
               <span>Salvar Nova Senha & Acessar</span>
             </button>
             <button type="button" class="btn btn-outline btn-full" id="reset-cancel-btn">
-              Voltar / Solicitar Novo Código
+              Não recebeu o código? Reenviar / Voltar
             </button>
           </div>
         </form>
@@ -404,21 +407,13 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
       try {
         const res = await candidateForgotPassword(email)
         pendingEmail = email
+        resetToken = ''
 
-        if (res.dev_reset_token) {
-          resetToken = res.dev_reset_token
-          showToast({
-            title: 'Código Gerado',
-            message: 'Token de redefinição gerado (válido por 15 minutos).',
-            type: 'info',
-          })
-        } else {
-          showToast({
-            title: 'Solicitação Enviada',
-            message: res.message || 'Verifique sua caixa de entrada para obter o link de recuperação.',
-            type: 'success',
-          })
-        }
+        showToast({
+          title: 'Código Enviado',
+          message: 'Enviamos o código de 6 dígitos para seu e-mail.',
+          type: 'success',
+        })
 
         currentMode = 'reset'
         renderForm()

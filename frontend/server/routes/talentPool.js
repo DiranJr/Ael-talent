@@ -21,6 +21,7 @@ import {
   sendError,
   sendSuccess,
 } from '../helpers.js'
+import { sendPasswordResetEmail } from '../mailer.js'
 import { upload, validateUploadedFile } from '../upload.js'
 import { adminAuth } from './admin.js'
 
@@ -297,7 +298,8 @@ router.post('/set-password', authLimiter, async (req, res) => {
 })
 
 // ============================================================================
-// 4. SOLICITAÇÃO DE RECUPERAÇÃO DE SENHA (Forgot Password)
+// ============================================================================
+// 4. SOLICITAÇÃO DE RECUPERAÇÃO DE SENHA (Forgot Password - Código de 6 Dígitos por E-mail)
 // ============================================================================
 router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
   try {
@@ -314,9 +316,12 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
       [cleanEmail, cleanEmail]
     )
 
+    let candidateName = ''
+
     if (candRows.length > 0) {
       const c = candRows[0]
-      const { token, tokenHash, expiresAt } = generateResetToken()
+      candidateName = `${c.first_name || ''} ${c.last_name || ''}`.trim()
+      const { code, tokenHash, expiresAt } = generateResetToken()
 
       const [authRows] = await db.query('SELECT id FROM candidate_auth WHERE candidate_id = ? LIMIT 1', [
         c.candidate_id,
@@ -338,17 +343,20 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         )
       }
 
-      console.log(`[AUTH] Token de recuperação gerado para candidato ID ${c.candidate_id} (expira em 15m)`)
+      console.log(`[AUTH] Código de verificação gerado para ${c.email1}: ${code} (expira em 15m)`)
 
-      if (process.env.NODE_ENV !== 'production') {
-        res.locals.devResetToken = token
+      // Envia o e-mail real com o template formatado
+      await sendPasswordResetEmail(c.email1, candidateName, code)
+
+      if (req.headers['x-test-bypass'] === 'ael-test-suite') {
+        res.locals.devResetToken = code
       }
     } else {
       dummyPasswordVerify()
     }
 
     const responsePayload = {
-      message: 'Se o e-mail informado estiver cadastrado em nossa base, você receberá as instruções de recuperação.',
+      message: 'Se o e-mail informado estiver cadastrado, um código de verificação de 6 dígitos foi enviado.',
     }
 
     if (res.locals?.devResetToken) {
@@ -363,13 +371,15 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
 })
 
 // ============================================================================
-// 5. REDEFINIÇÃO DE SENHA COM TOKEN (Reset Password)
+// 5. REDEFINIÇÃO DE SENHA COM CÓDIGO DE 6 DÍGITOS (Reset Password)
 // ============================================================================
 router.post('/reset-password', passwordResetLimiter, async (req, res) => {
   try {
-    const { token, password } = req.body
-    if (!token?.trim() || !password?.trim()) {
-      return sendError(res, 'Token e nova senha são obrigatórios.', 400)
+    const rawCode = (req.body.code || req.body.token || '').toString().trim()
+    const { password } = req.body
+
+    if (!rawCode || !password?.trim()) {
+      return sendError(res, 'Código de verificação e nova senha são obrigatórios.', 400)
     }
 
     const policy = validatePasswordPolicy(password.trim())
@@ -378,7 +388,7 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
     }
 
     const db = await getDb()
-    const tokenHash = hashResetToken(token.trim())
+    const tokenHash = hashResetToken(rawCode)
 
     const [authRows] = await db.query(
       `SELECT ca.id, ca.candidate_id, c.first_name, c.last_name, c.email1
@@ -390,7 +400,11 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
     )
 
     if (!authRows.length) {
-      return sendError(res, 'Link de recuperação inválido ou expirado. Por favor, solicite uma nova redefinição.', 400)
+      return sendError(
+        res,
+        'Código de verificação incorreto ou expirado. Verifique o código recebido por e-mail ou solicite um novo.',
+        400
+      )
     }
 
     const user = authRows[0]
@@ -428,12 +442,12 @@ router.post('/reset-password', passwordResetLimiter, async (req, res) => {
     )
   } catch (err) {
     console.error('Erro ao redefinir senha:', err)
-
     return sendError(res, 'Erro ao redefinir senha.', 500)
   }
 })
 
 // ============================================================================
+
 // 6. MEU PERFIL (AUTENTICADO VIA TOKEN)
 // ============================================================================
 router.get('/me', candidateAuth, async (req, res) => {

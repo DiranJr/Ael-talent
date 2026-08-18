@@ -102,21 +102,21 @@ export function verifyAdminToken(token) {
 }
 
 /**
- * Gera token criptográfico de recuperação de senha (32 bytes) e seu hash SHA-256
- * @returns {{ token: string, tokenHash: string, expiresAt: Date }}
+ * Gera código de verificação de 6 dígitos para recuperação de senha e seu hash SHA-256
+ * @returns {{ code: string, token: string, tokenHash: string, expiresAt: Date }}
  */
 export function generateResetToken() {
-  const token = crypto.randomBytes(32).toString('hex')
-  const tokenHash = hashResetToken(token)
+  const code = crypto.randomInt(100000, 1000000).toString()
+  const tokenHash = hashResetToken(code)
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutos
-  return { token, tokenHash, expiresAt }
+  return { code, token: code, tokenHash, expiresAt }
 }
 
 /**
- * Calcula SHA-256 do token de recuperação
+ * Calcula SHA-256 do código ou token de recuperação
  * @param {string} token
  * @returns {string}
  */
 export function hashResetToken(token) {
-  return crypto.createHash('sha256').update(token).digest('hex')
+  return crypto.createHash('sha256').update(String(token).trim()).digest('hex')
 }
