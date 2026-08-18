@@ -1192,11 +1192,12 @@ export async function renderTalentPoolRegister(params, appEl) {
       payload.append('notes', formData.notes)
       payload.append('key_skills', (formData.key_skills || []).join(', '))
       payload.append('consent_lgpd', 'true')
-      payload.append('job_id', targetJobId || '')
+      payload.append('job_id', jobId || targetJob?.joborder_id || '')
 
-      if (formData.password && !candidateData) {
+      if (formData.password && !loggedInCandidate) {
         payload.append('password', formData.password)
       }
+
 
       if (formData.photo) {
         payload.append('photo', formData.photo)
