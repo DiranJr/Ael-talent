@@ -349,6 +349,14 @@ export async function candidateForgotPassword(email) {
   })
 }
 
+/** Solicitar link de primeiro acesso */
+export async function candidateFirstAccess(email) {
+  return apiFetch('/talent-pool/first-access', {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  })
+}
+
 /** Redefinir senha com token de recuperação */
 export async function candidateResetPassword(token, password) {
   return apiFetch('/talent-pool/reset-password', {

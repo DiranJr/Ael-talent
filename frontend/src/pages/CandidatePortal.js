@@ -431,7 +431,6 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
         btn.disabled = false
         btn.querySelector('span').textContent = 'Enviar Instruções de Recuperação'
       }
-
     })
 
     // 3. Submit de Redefinição com Token (Reset)

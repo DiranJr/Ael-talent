@@ -10,6 +10,7 @@ import { dummyPasswordVerify, hashPassword, validatePasswordPolicy, verifyPasswo
 import { authLimiter, passwordResetLimiter, registrationLimiter } from '../auth/rateLimit.js'
 import { generateResetToken, hashResetToken, signCandidateToken, verifyCandidateToken } from '../auth/tokens.js'
 import { getDb } from '../db.js'
+import { sendFirstAccessEmail, sendPasswordResetEmail } from '../email/index.js'
 import {
   formatCandidateProfile,
   formatWhatsAppUrl,
@@ -21,7 +22,6 @@ import {
   sendError,
   sendSuccess,
 } from '../helpers.js'
-import { sendPasswordResetEmail } from '../mailer.js'
 import { upload, validateUploadedFile } from '../upload.js'
 import { adminAuth } from './admin.js'
 
@@ -298,8 +298,7 @@ router.post('/set-password', authLimiter, async (req, res) => {
 })
 
 // ============================================================================
-// ============================================================================
-// 4. SOLICITAÇÃO DE RECUPERAÇÃO DE SENHA (Forgot Password - Código de 6 Dígitos por E-mail)
+// 4. SOLICITAÇÃO DE RECUPERAÇÃO DE SENHA (Forgot Password — Brevo E-mail)
 // ============================================================================
 router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
   try {
@@ -343,12 +342,19 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
         )
       }
 
-      console.log(`[AUTH] Código de verificação gerado para ${c.email1}: ${code} (expira em 15m)`)
+      // Envia o e-mail via Brevo / Transporter centralizado
+      await sendPasswordResetEmail({
+        toEmail: c.email1,
+        candidateName,
+        token: code,
+        code,
+        requestId: req.id || 'forgot-pwd',
+      })
 
-      // Envia o e-mail real com o template formatado
-      await sendPasswordResetEmail(c.email1, candidateName, code)
-
-      if (!process.env.SMTP_HOST || req.headers['x-test-bypass'] === 'ael-test-suite') {
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        (!process.env.SMTP_HOST || req.headers['x-test-bypass'] === 'ael-test-suite')
+      ) {
         res.locals.devResetToken = code
       }
     } else {
@@ -356,18 +362,100 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     }
 
     const responsePayload = {
-      message: 'Se o e-mail informado estiver cadastrado, um código de verificação de 6 dígitos foi enviado.',
-      smtp_configured: Boolean(process.env.SMTP_HOST),
+      message: 'Se o e-mail informado estiver cadastrado em nossa base, as instruções para redefinição foram enviadas.',
+      smtp_configured: Boolean(process.env.SMTP_USER && process.env.SMTP_PASS),
     }
 
-    if (res.locals?.devResetToken) {
+    // Em produção, NUNCA expor token na resposta HTTP
+    if (process.env.NODE_ENV !== 'production' && res.locals?.devResetToken) {
       responsePayload.dev_reset_token = res.locals.devResetToken
     }
-
 
     return sendSuccess(res, responsePayload)
   } catch (err) {
     console.error('Erro na solicitação de recuperação de senha:', err)
+    return sendError(res, 'Erro ao processar solicitação.', 500)
+  }
+})
+
+// ============================================================================
+// 4.1. SOLICITAÇÃO DE PRIMEIRO ACESSO (First Access — Brevo E-mail)
+// ============================================================================
+router.post('/first-access', passwordResetLimiter, async (req, res) => {
+  try {
+    const { email } = req.body
+    if (!email?.trim()) {
+      return sendError(res, 'Informe seu e-mail cadastrado.', 400)
+    }
+
+    const db = await getDb()
+    const cleanEmail = email.trim().toLowerCase()
+
+    const [candRows] = await db.query(
+      'SELECT candidate_id, first_name, last_name, email1 FROM candidate WHERE (email1 = ? OR email2 = ?) AND is_active = 1 LIMIT 1',
+      [cleanEmail, cleanEmail]
+    )
+
+    let candidateName = ''
+
+    if (candRows.length > 0) {
+      const c = candRows[0]
+      candidateName = `${c.first_name || ''} ${c.last_name || ''}`.trim()
+      const { code, tokenHash, expiresAt } = generateResetToken()
+
+      const [authRows] = await db.query('SELECT id FROM candidate_auth WHERE candidate_id = ? LIMIT 1', [
+        c.candidate_id,
+      ])
+
+      if (authRows.length > 0) {
+        await db.query(
+          `UPDATE candidate_auth SET
+            reset_token_hash = ?,
+            reset_token_expires_at = ?
+           WHERE candidate_id = ?`,
+          [tokenHash, expiresAt, c.candidate_id]
+        )
+      } else {
+        await db.query(
+          `INSERT INTO candidate_auth (candidate_id, password_hash, reset_token_hash, reset_token_expires_at, created_at, updated_at)
+           VALUES (?, '', ?, ?, NOW(), NOW())`,
+          [c.candidate_id, tokenHash, expiresAt]
+        )
+      }
+
+      // Envia o e-mail de primeiro acesso via Brevo
+      await sendFirstAccessEmail({
+        toEmail: c.email1,
+        candidateName,
+        token: code,
+        code,
+        requestId: req.id || 'first-access',
+      })
+
+      if (
+        process.env.NODE_ENV !== 'production' &&
+        (!process.env.SMTP_HOST || req.headers['x-test-bypass'] === 'ael-test-suite')
+      ) {
+        res.locals.devResetToken = code
+      }
+    } else {
+      dummyPasswordVerify()
+    }
+
+    const responsePayload = {
+      message:
+        'Se o e-mail informado estiver cadastrado em nossa base, as instruções de primeiro acesso foram enviadas.',
+      smtp_configured: Boolean(process.env.SMTP_USER && process.env.SMTP_PASS),
+    }
+
+    // Em produção, NUNCA expor token na resposta HTTP
+    if (process.env.NODE_ENV !== 'production' && res.locals?.devResetToken) {
+      responsePayload.dev_reset_token = res.locals.devResetToken
+    }
+
+    return sendSuccess(res, responsePayload)
+  } catch (err) {
+    console.error('Erro na solicitação de primeiro acesso:', err)
     return sendError(res, 'Erro ao processar solicitação.', 500)
   }
 })

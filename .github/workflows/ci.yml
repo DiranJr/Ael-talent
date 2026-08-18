@@ -7,7 +7,9 @@ on:
       - develop
       - 'chore/**'
       - 'feature/**'
+      - 'feat/**'
       - 'fix/**'
+
   pull_request:
     branches:
       - main

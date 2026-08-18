@@ -143,6 +143,7 @@ app.get('/api/health', async (req, res) => {
       status: 'ok',
       uptime: Math.floor(process.uptime()),
       db: 'connected',
+      email: process.env.SMTP_USER && process.env.SMTP_PASS ? 'configured' : 'unconfigured',
       timestamp: new Date().toISOString(),
       request_id: req.id,
     })
