@@ -153,23 +153,26 @@ export async function adminStatsHandler(req, res) {
       jobParams
     )
 
-    // 3. Total de candidatos cadastrados
+    // 3. Total de candidatos cadastrados ativos
     const [[{ total_candidates }]] = await db.execute(`
-      SELECT COUNT(*) AS total_candidates FROM candidate
+      SELECT COUNT(*) AS total_candidates FROM candidate WHERE is_active = 1
     `)
 
-    // 4. Candidaturas nos últimos 7 dias
+    // 4. Candidaturas nos últimos 7 dias (candidatos ativos)
     const [[{ recent_applications }]] = await db.execute(
       `
       SELECT COUNT(*) AS recent_applications
       FROM candidate_joborder cj
       JOIN joborder jo ON cj.joborder_id = jo.joborder_id
-      WHERE cj.date_created >= DATE_SUB(NOW(), INTERVAL 7 DAY) ${appScopeWhere}
+      JOIN candidate c ON cj.candidate_id = c.candidate_id
+      WHERE cj.date_created >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+        AND c.is_active = 1
+        ${appScopeWhere}
     `,
       appParams
     )
 
-    // 5. Últimas 6 candidaturas recebidas
+    // 5. Últimas 6 candidaturas recebidas de candidatos ativos
     const [latestApplications] = await db.execute(
       `
       SELECT
@@ -191,12 +194,13 @@ export async function adminStatsHandler(req, res) {
       JOIN candidate c ON cj.candidate_id = c.candidate_id
       JOIN joborder jo ON cj.joborder_id = jo.joborder_id
       LEFT JOIN attachment att ON att.data_item_id = c.candidate_id AND att.data_item_type = 100 AND att.resume = 1
-      WHERE 1=1 ${appScopeWhere}
+      WHERE c.is_active = 1 ${appScopeWhere}
       ORDER BY cj.date_created DESC
       LIMIT 6
     `,
       appParams
     )
+
 
     // 6. Vagas com mais candidaturas
     const [topJobs] = await db.execute(

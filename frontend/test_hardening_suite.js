@@ -75,8 +75,10 @@ async function runHardeningTests() {
   const results = []
   const db = await getDb()
 
-  // ─── TESTE 1: Tokens HMAC Timing-Safe e Validação Rigorosa ─────────
-  console.log('--- TESTE 1: Tokens HMAC Timing-Safe (Unitário) ---')
+  try {
+    // ─── TESTE 1: Tokens HMAC Timing-Safe e Validação Rigorosa ─────────
+    console.log('--- TESTE 1: Tokens HMAC Timing-Safe (Unitário) ---')
+
   const validCandToken = signCandidateToken({ candidate_id: 999, email: 'cand@teste.com' })
   const validCandPayload = verifyCandidateToken(validCandToken)
 
@@ -525,35 +527,38 @@ async function runHardeningTests() {
     detail: `Limitador ativado com HTTP 429 sem header de bypass: ${hitRateLimit}`
   })
 
+  } finally {
+    // Teardown: limpeza automática de massas de teste
+    try {
+      const [testCands] = await db.query(`
+        SELECT candidate_id FROM candidate
+        WHERE email1 LIKE '%@aelengenharia.com.br' OR email1 LIKE '%brute%' OR email1 LIKE '%auditoria%' OR email1 LIKE '%legado%'
+      `)
+      const testIds = testCands.map((c) => c.candidate_id)
+      if (testIds.length > 0) {
+        await db.query(`DELETE FROM attachment WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM extra_field WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM candidate_joborder_status_history WHERE candidate_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM candidate_joborder WHERE candidate_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM candidate WHERE candidate_id IN (?)`, [testIds])
+      }
+    } catch (cleanErr) {
+      console.warn('Aviso de limpeza de teste:', cleanErr.message)
+    }
+
+    await db.end()
+  }
+
   console.log('\n======================================================================')
   console.log('RESUMO FINAL DOS TESTES DE HARDENING & SEGURANÇA:')
   console.log('======================================================================')
   console.table(results)
 
-  const allPassed = results.every(r => r.status === 'APROVADO')
+  const allPassed = results.every((r) => r.status === 'APROVADO')
   console.log(`\nStatus Geral: ${allPassed ? '✅ 100% APROVADO' : '❌ FALHAS ENCONTRADAS'}\n`)
-
-  // Teardown: limpeza automática de massas de teste
-  try {
-    const [testCands] = await db.query(`
-      SELECT candidate_id FROM candidate
-      WHERE email1 LIKE '%@aelengenharia.com.br' OR email1 LIKE '%brute%' OR email1 LIKE '%auditoria%' OR email1 LIKE '%legado%'
-    `)
-    const testIds = testCands.map(c => c.candidate_id)
-    if (testIds.length > 0) {
-      await db.query(`DELETE FROM attachment WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM extra_field WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM candidate_joborder_status_history WHERE candidate_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM candidate_joborder WHERE candidate_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM candidate WHERE candidate_id IN (?)`, [testIds])
-    }
-  } catch (cleanErr) {
-    console.warn('Aviso de limpeza de teste:', cleanErr.message)
-  }
-
-  await db.end()
 }
 
 runHardeningTests().catch(console.error)
+
 
 

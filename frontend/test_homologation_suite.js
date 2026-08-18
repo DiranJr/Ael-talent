@@ -96,10 +96,12 @@ async function runHomologationSuite() {
   const results = []
   const db = await getDb()
 
-  // ──────────────────────────────────────────────────────────────────
-  // TESTE 1: Banco de Talentos SEM Currículo (Estruturado Puro)
-  // ──────────────────────────────────────────────────────────────────
-  console.log('--- TESTE 1: Cadastro no Banco de Talentos SEM Currículo ---')
+  try {
+    // ──────────────────────────────────────────────────────────────────
+    // TESTE 1: Banco de Talentos SEM Currículo (Estruturado Puro)
+    // ──────────────────────────────────────────────────────────────────
+    console.log('--- TESTE 1: Cadastro no Banco de Talentos SEM Currículo ---')
+
   try {
     const email1 = `candidato.semcurriculo.${Date.now()}@ael.dev`
     const { body, contentType } = buildMultipartFormData({
@@ -636,6 +638,28 @@ function createValidPdfBuffer(title = 'Curriculo do Candidato - A&L Talent') {
     results.push({ test: '12. Recuperação de Senha', status: 'FALHOU', detail: err.message })
   }
 
+  } finally {
+    // Teardown: limpeza automática de massas de teste
+    try {
+      const [testCands] = await db.query(`
+        SELECT candidate_id FROM candidate
+        WHERE email1 LIKE '%@ael.dev' OR email1 LIKE '%homolog%' OR email1 LIKE '%compdf%' OR email1 LIKE '%semcurriculo%'
+      `)
+      const testIds = testCands.map((c) => c.candidate_id)
+      if (testIds.length > 0) {
+        await db.query(`DELETE FROM attachment WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM extra_field WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM candidate_joborder_status_history WHERE candidate_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM candidate_joborder WHERE candidate_id IN (?)`, [testIds])
+        await db.query(`DELETE FROM candidate WHERE candidate_id IN (?)`, [testIds])
+      }
+    } catch (cleanErr) {
+      console.warn('Aviso de limpeza de teste:', cleanErr.message)
+    }
+
+    await db.end()
+  }
+
   // ──────────────────────────────────────────────────────────────────
   // RESUMO FINAL
   // ──────────────────────────────────────────────────────────────────
@@ -644,33 +668,14 @@ function createValidPdfBuffer(title = 'Curriculo do Candidato - A&L Talent') {
   console.log('======================================================================')
   console.table(results)
 
-  const allPassed = results.every(r => r.status === 'APROVADO')
+  const allPassed = results.every((r) => r.status === 'APROVADO')
   console.log(`\nStatus Geral da Homologação: ${allPassed ? '✅ 100% APROVADO' : '❌ FALHAS ENCONTRADAS'}\n`)
 
-  // Teardown: limpeza automática de massas de teste
-  try {
-    const [testCands] = await db.query(`
-      SELECT candidate_id FROM candidate
-      WHERE email1 LIKE '%@ael.dev' OR email1 LIKE '%homolog%' OR email1 LIKE '%compdf%' OR email1 LIKE '%semcurriculo%'
-    `)
-    const testIds = testCands.map(c => c.candidate_id)
-    if (testIds.length > 0) {
-      await db.query(`DELETE FROM attachment WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM extra_field WHERE data_item_type = 100 AND data_item_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM candidate_joborder_status_history WHERE candidate_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM candidate_joborder WHERE candidate_id IN (?)`, [testIds])
-      await db.query(`DELETE FROM candidate WHERE candidate_id IN (?)`, [testIds])
-    }
-  } catch (cleanErr) {
-    console.warn('Aviso de limpeza de teste:', cleanErr.message)
-  }
-
-  await db.end()
   process.exit(allPassed ? 0 : 1)
 }
-
 
 runHomologationSuite().catch((err) => {
   console.error(err)
   process.exit(1)
 })
+
