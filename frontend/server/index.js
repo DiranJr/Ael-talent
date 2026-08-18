@@ -3,15 +3,20 @@
  * API proxy entre o Vite SPA e o banco OpenCATS (MariaDB)
  */
 
+import crypto from 'node:crypto'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import cors from 'cors'
-import crypto from 'crypto'
 import express from 'express'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { adminAuthLimiter } from './auth/rateLimit.js'
 import { getDb } from './db.js'
 import { sendError } from './helpers.js'
 import { logger } from './logger.js'
+import { upload } from './upload.js'
+
+// Rotas públicas
+import { applyHandler } from './routes/apply.js'
+import { filtersHandler, jobDetailHandler, jobsHandler } from './routes/jobs.js'
+
 // Rotas administrativas (RH) e middleware de autenticação
 import {
   adminAuth,
@@ -23,28 +28,53 @@ import {
 } from './routes/admin.js'
 
 import {
-  adminDownloadAttachmentHandler,
-  adminGetCandidateDetailHandler,
-  adminGetCandidatesHandler,
-  adminUpdateCandidateStatusHandler,
-} from './routes/adminCandidates.js'
-import {
   adminCreateJobHandler,
   adminDeleteJobHandler,
   adminGetJobsHandler,
   adminToggleJobStatusHandler,
   adminUpdateJobHandler,
 } from './routes/adminJobs.js'
+
+import {
+  adminDownloadAttachmentHandler,
+  adminGetCandidateDetailHandler,
+  adminGetCandidatesHandler,
+  adminUpdateCandidateStatusHandler,
+} from './routes/adminCandidates.js'
+
+import { adminAuthLimiter } from './auth/rateLimit.js'
 import adminUsersRouter from './routes/adminUsers.js'
-// Rotas públicas
-import { applyHandler } from './routes/apply.js'
-import { filtersHandler, jobDetailHandler, jobsHandler } from './routes/jobs.js'
 import talentPoolRouter from './routes/talentPool.js'
-import { upload } from './upload.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const app = express()
 const PORT = process.env.PORT || 3001
+
+// ─── Configuração de Trust Proxy para Nginx ────────────────────
+// Permite que o Express identifique corretamente os IPs de clientes atrás do proxy reverso
+app.set('trust proxy', process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 1)
+
+// ─── Validação de Prontidão de Produção (Fail-Fast) ─────────────
+if (process.env.NODE_ENV === 'production') {
+  const candidateSecret = process.env.SESSION_SECRET || ''
+  const adminSecret = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || ''
+
+  const weakSecrets = new Set(['changeme', 'secret', 'default', 'ael_dev', 'admin', 'cats', 'ael_talent_candidate_secret_2024', 'ael_talent_admin_secret_2024'])
+
+  if (!candidateSecret || candidateSecret.length < 32 || weakSecrets.has(candidateSecret.toLowerCase())) {
+    logger.error('CRÍTICO: SESSION_SECRET inseguro ou ausente em produção! O processo será encerrado.', {
+      error: new Error('SESSION_SECRET fraco ou padrão detectado.'),
+    })
+    process.exit(1)
+  }
+
+  if (!adminSecret || adminSecret.length < 32 || weakSecrets.has(adminSecret.toLowerCase())) {
+    logger.error('CRÍTICO: ADMIN_SESSION_SECRET inseguro ou ausente em produção! O processo será encerrado.', {
+      error: new Error('ADMIN_SESSION_SECRET fraco ou padrão detectado.'),
+    })
+    process.exit(1)
+  }
+}
 
 // ─── Middleware de Request ID & Observabilidade ────────────────
 app.use((req, res, next) => {
@@ -69,7 +99,7 @@ app.use((req, res, next) => {
 })
 
 // ─── Middlewares de Segurança e Headers HTTP ────────────────────
-app.use((req, res, next) => {
+app.use((_req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('X-Frame-Options', 'SAMEORIGIN')
   res.setHeader('X-XSS-Protection', '1; mode=block')
@@ -95,7 +125,7 @@ app.use(
         ? ['Content-Type', 'Authorization', 'x-test-bypass', 'x-request-id']
         : ['Content-Type', 'Authorization', 'x-request-id'],
     exposedHeaders: ['x-request-id'],
-  })
+  }),
 )
 
 app.use(express.json({ limit: '2mb' }))
@@ -162,6 +192,18 @@ app.get('*', (req, res) => {
     return sendError(res, 'Recurso não encontrado.', 404)
   }
   res.sendFile(path.join(distDir, 'index.html'))
+})
+
+// ─── Middleware Centralizado de Tratamento de Erros ─────────────
+app.use((err, req, res, _next) => {
+  logger.error(`Erro não tratado na requisição: ${err.message}`, {
+    requestId: req.id,
+    error: err,
+    route: req.originalUrl,
+    method: req.method,
+  })
+  const message = process.env.NODE_ENV === 'production' ? 'Ocorreu um erro interno no servidor.' : err.message
+  return sendError(res, message, err.status || 500)
 })
 
 // ─── Start ──────────────────────────────────────────────────────
