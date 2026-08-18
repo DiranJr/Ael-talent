@@ -7,10 +7,12 @@
 import express from 'express'
 import { candidateAuth } from '../auth/candidateAuth.js'
 import { dummyPasswordVerify, hashPassword, validatePasswordPolicy, verifyPassword } from '../auth/password.js'
-import { authLimiter, passwordResetLimiter, registrationLimiter } from '../auth/rateLimit.js'
+import { authLimiter, emailCooldownLimiter, passwordResetLimiter, registrationLimiter } from '../auth/rateLimit.js'
 import { generateResetToken, hashResetToken, signCandidateToken, verifyCandidateToken } from '../auth/tokens.js'
 import { getDb } from '../db.js'
 import { sendFirstAccessEmail, sendPasswordResetEmail } from '../email/index.js'
+
+
 import {
   formatCandidateProfile,
   formatWhatsAppUrl,
@@ -300,7 +302,8 @@ router.post('/set-password', authLimiter, async (req, res) => {
 // ============================================================================
 // 4. SOLICITAÇÃO DE RECUPERAÇÃO DE SENHA (Forgot Password — Brevo E-mail)
 // ============================================================================
-router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
+router.post('/forgot-password', passwordResetLimiter, emailCooldownLimiter, async (req, res) => {
+
   try {
     const { email } = req.body
     if (!email?.trim()) {
@@ -381,7 +384,8 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
 // ============================================================================
 // 4.1. SOLICITAÇÃO DE PRIMEIRO ACESSO (First Access — Brevo E-mail)
 // ============================================================================
-router.post('/first-access', passwordResetLimiter, async (req, res) => {
+router.post('/first-access', passwordResetLimiter, emailCooldownLimiter, async (req, res) => {
+
   try {
     const { email } = req.body
     if (!email?.trim()) {

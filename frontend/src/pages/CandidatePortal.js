@@ -53,14 +53,39 @@ export async function renderCandidatePortal(params, appEl) {
   }
 }
 
-// ─── TELA DE AUTENTICAÇÃO E RECUPERAÇÃO DE SENHA DO CANDIDATO ────────────────
 function renderAuthScreen(appEl, departments, initialParams = {}) {
   // Modos: 'login' | 'forgot' | 'reset' | 'first_access'
   let currentMode = initialParams?.token ? 'reset' : 'login'
   let pendingEmail = ''
   let resetToken = initialParams?.token || ''
+  let resendCooldownSec = 0
+  let resendTimer = null
+
+  function startResendCooldown(seconds = 60) {
+    if (resendTimer) clearInterval(resendTimer)
+    resendCooldownSec = seconds
+    resendTimer = setInterval(() => {
+      resendCooldownSec--
+      const btn = document.getElementById('btn-resend-code')
+      if (btn) {
+        if (resendCooldownSec > 0) {
+          btn.disabled = true
+          btn.textContent = `Aguarde (${resendCooldownSec}s) para reenviar`
+        } else {
+          btn.disabled = false
+          btn.textContent = 'Reenviar Código por E-mail'
+          clearInterval(resendTimer)
+          resendTimer = null
+        }
+      } else if (resendCooldownSec <= 0) {
+        clearInterval(resendTimer)
+        resendTimer = null
+      }
+    }, 1000)
+  }
 
   function renderForm() {
+
     let cardContent = ''
 
     if (currentMode === 'login') {
@@ -179,7 +204,7 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
           </div>
           <h2 style="font-size: 1.5rem; font-weight: 800; color: var(--ael-ink);">Validar Código de 6 Dígitos</h2>
           <p style="font-size: 0.875rem; color: var(--ael-muted); margin-top: 0.25rem;">
-            Enviamos um código de verificação para o seu e-mail. Digite-o abaixo junto com sua nova senha.
+            Enviamos um código de verificação para <strong>${escHtml(pendingEmail)}</strong>. Digite-o abaixo junto com sua nova senha.
           </p>
         </div>
 
@@ -242,13 +267,17 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
             <button type="submit" class="btn btn-primary btn-full btn-lg" id="reset-submit-btn">
               <span>Salvar Nova Senha & Acessar</span>
             </button>
-            <button type="button" class="btn btn-outline btn-full" id="reset-cancel-btn">
-              Não recebeu o código? Reenviar / Voltar
+            <button type="button" class="btn btn-outline btn-full" id="btn-resend-code" ${resendCooldownSec > 0 ? 'disabled' : ''}>
+              ${resendCooldownSec > 0 ? `Aguarde (${resendCooldownSec}s) para reenviar` : 'Reenviar Código por E-mail'}
+            </button>
+            <button type="button" class="btn btn-link btn-sm" id="reset-cancel-btn" style="text-align: center; color: var(--ael-muted); background: none; border: none; cursor: pointer; padding: 0.5rem; text-decoration: underline;">
+              ← Voltar ao Login
             </button>
           </div>
         </form>
       `
     } else if (currentMode === 'first_access') {
+
       cardContent = `
         <div style="text-align: center; margin-bottom: 2rem;">
           <div style="
@@ -405,33 +434,48 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
       btn.querySelector('span').textContent = 'Enviando instruções...'
 
       try {
-        const res = await candidateForgotPassword(email)
+        await candidateForgotPassword(email)
         pendingEmail = email
         resetToken = ''
 
-        if (res.dev_reset_token) {
-          showToast({
-            title: 'Código de Teste (Local)',
-            message: `Seu código de validação é: ${res.dev_reset_token}`,
-            type: 'info',
-            duration: 12000,
-          })
-        } else {
-          showToast({
-            title: 'Código Enviado',
-            message: 'Enviamos o código de 6 dígitos para seu e-mail.',
-            type: 'success',
-          })
-        }
+        showToast({
+          title: 'Código Enviado',
+          message: 'Enviamos o código de 6 dígitos para seu e-mail.',
+          type: 'success',
+        })
 
+        startResendCooldown(60)
         currentMode = 'reset'
         renderForm()
       } catch (err) {
-        showToast({ title: 'Erro na Solicitação', message: err.message, type: 'error' })
+        showToast({ title: 'Aviso', message: err.message, type: 'error' })
         btn.disabled = false
         btn.querySelector('span').textContent = 'Enviar Instruções de Recuperação'
       }
     })
+
+    // 2.1 Reenviar Código de 6 Dígitos com Cooldown
+    document.getElementById('btn-resend-code')?.addEventListener('click', async () => {
+      if (resendCooldownSec > 0 || !pendingEmail) return
+      const btn = document.getElementById('btn-resend-code')
+      btn.disabled = true
+      btn.textContent = 'Enviando novo código...'
+
+      try {
+        await candidateForgotPassword(pendingEmail)
+        showToast({
+          title: 'Código Reenviado',
+          message: 'Um novo código de 6 dígitos foi enviado para seu e-mail.',
+          type: 'success',
+        })
+        startResendCooldown(60)
+      } catch (err) {
+        showToast({ title: 'Aviso', message: err.message, type: 'error' })
+        btn.disabled = false
+        btn.textContent = 'Reenviar Código por E-mail'
+      }
+    })
+
 
     // 3. Submit de Redefinição com Token (Reset)
     document.getElementById('candidate-reset-form')?.addEventListener('submit', async (e) => {
