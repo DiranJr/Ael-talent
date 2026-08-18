@@ -13,6 +13,8 @@
     "lint:fix": "biome check --write src server",
     "format": "biome format --write src server",
     "test:unit": "vitest run test/unit",
+    "test:email": "vitest run test/unit/email.test.js",
+    "email:test": "node ../scripts/test-email.js",
     "test:e2e": "playwright test",
     "test:smoke": "node ../scripts/smoke-production.js",
     "test:backup": "node ../scripts/test_backup_restore.js",
@@ -22,6 +24,7 @@
     "test:recruiter": "node test_recruiter_feature.js",
     "test:all": "node test_hardening_suite.js && node test_audit_suite.js && node test_homologation_suite.js && node test_recruiter_feature.js"
   },
+
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
     "@playwright/test": "1.62.1",

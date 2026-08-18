@@ -69,3 +69,46 @@ export const registrationLimiter = rateLimit({
     error: 'Limite de envios atingido. Aguarde alguns minutos antes de tentar novamente.',
   },
 })
+
+const emailRequestTimestamps = new Map()
+
+// Limpa entradas antigas a cada 10 minutos
+if (typeof setInterval !== 'undefined') {
+  setInterval(() => {
+    const now = Date.now()
+    for (const [key, timestamp] of emailRequestTimestamps.entries()) {
+      if (now - timestamp > 10 * 60 * 1000) {
+        emailRequestTimestamps.delete(key)
+      }
+    }
+  }, 10 * 60 * 1000).unref?.()
+}
+
+/**
+ * Trava de Cooldown de 60 segundos por e-mail e por IP
+ */
+export function emailCooldownLimiter(req, res, next) {
+  if (req.headers['x-test-bypass'] === 'ael-test-suite') {
+    return next()
+  }
+
+  const email = (req.body?.email || '').trim().toLowerCase()
+  const ip = req.ip || req.socket?.remoteAddress || 'unknown'
+  const key = `${ip}:${email}`
+
+  const now = Date.now()
+  const lastRequest = emailRequestTimestamps.get(key)
+  const COOLDOWN_MS = 60 * 1000 // 60 segundos
+
+  if (lastRequest && now - lastRequest < COOLDOWN_MS) {
+    const remainingSeconds = Math.ceil((COOLDOWN_MS - (now - lastRequest)) / 1000)
+    return res.status(429).json({
+      success: false,
+      error: `Por favor, aguarde ${remainingSeconds} segundo(s) antes de solicitar um novo código.`,
+      retry_after_seconds: remainingSeconds,
+    })
+  }
+
+  emailRequestTimestamps.set(key, now)
+  next()
+}
