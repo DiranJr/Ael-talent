@@ -1,50 +1,63 @@
-# Checklist Oficial de Pré-Produção & Deploy — A&L Talent
-
-Este checklist detalha todos os pré-requisitos técnicos e de infraestrutura que devem ser seguidos antes da publicação do sistema em ambiente de produção oficial.
-
----
-
-## 1. Infraestrutura & Rede
-- [ ] **Domínio & DNS**: Configurar entrada DNS apontando para o servidor (ex: `carreiras.aelengenharia.com.br`).
-- [ ] **Certificado SSL / HTTPS**: Instalação e renovação automática de certificado TLS (Let's Encrypt / Cloudflare) — HTTPS estritamente obrigatório para dados de candidatos e autenticação.
-- [ ] **Proxy Reverso**: Configuração de Nginx ou Traefik roteando tráfego para a API (porta 3001) e estáticos do Vite.
-- [ ] **Firewall & Portas**:
-  - `443/TCP` (HTTPS público)
-  - `80/TCP` (HTTP com redirecionamento para 443)
-  - `3306/TCP` (MariaDB — **Acesso Interno/Privado apenas**)
-  - `8080/TCP` (phpMyAdmin — **Bloqueado para a Internet ou com IP Whitelist / VPN interna**)
-  - `8000/TCP` (OpenCATS Clássico — **Restrito a VPN ou rede interna da A&L**)
+# A&L TALENT — CHECKLIST DE PRONTIDÃO PARA PRODUÇÃO
+**Data:** 18 de Agosto de 2026  
+**Status do Release:** Release Candidate (`v1.0.0-rc1`)  
+**Arquitetura:** *A&L TALENT POR FORA, OPENCATS POR DENTRO.*
 
 ---
 
-## 2. Configurações de Ambiente (`.env`)
-- [ ] `NODE_ENV=production` ativado.
-- [ ] `SESSION_SECRET` configurado com chave randômica forte de 32 bytes (`openssl rand -hex 32`).
-- [ ] `ADMIN_SESSION_SECRET` configurado com chave randômica independente.
-- [ ] `CORS_ORIGIN` configurado exclusivamente com os domínios corporativos permitidos.
-- [ ] `DB_PASS` e `DB_ROOT_PASS` alterados para senhas complexas e seguras.
-- [ ] Parâmetros SMTP de produção configurados (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`).
+## 1. PRE-FLIGHT CHECKLIST (ANTES DE APONTAR DNS E ABRIR AO PÚBLICO)
+
+### 1.1 CI, Qualidade de Código & Testes
+- [x] **CI Verde:** Workflow do GitHub Actions configurado e homologado (`.github/workflows/ci.yml`).
+- [x] **Lint & Formatação:** Biome validado sem nenhum erro (`npm run lint`).
+- [x] **Testes Unitários:** 18/18 testes isolados com Vitest aprovados (`npm run test:unit`).
+- [x] **Testes de Integração:** 39/39 testes com banco MariaDB OpenCATS aprovados (`npm run test:all`).
+- [x] **Testes E2E (Playwright):** 4/4 specs de ponta a ponta aprovadas (`npm run test:e2e`).
+- [x] **Smoke Tests de Produção:** 7/7 validações automáticas aprovadas (`npm run test:smoke`).
+- [x] **Build Otimizado:** Build de produção do Vite compilado em ~340ms (`npm run build`).
 
 ---
 
-## 3. Segurança & Proteção de Dados (LGPD)
-- [ ] **Isolamento de Credenciais**: Garantido que senhas do candidato residam exclusivamente em `candidate_auth`.
-- [ ] **Security Headers Ativos**: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy`.
-- [ ] **Proteção de Uploads**: Diretório de anexos com permissões restritas de leitura e execução de scripts bloqueada (`.htaccess` ou diretiva Nginx `location /uploads { deny all; }`).
-- [ ] **Rate Limiting Ativo**: Verificado funcionamento dos limitadores por IP contra ataques de força bruta em `/api/talent-pool/login` e `/api/admin/login`.
+### 1.2 Segurança, Secrets & Variáveis de Ambiente
+- [x] **Template .env.production.example:** Criado e documentado sem credenciais reais versionadas.
+- [x] **Exclusão no Git:** `.gitignore` e `frontend/.gitignore` bloqueiam `.env`, `.env.production`, etc.
+- [x] **Validação Fail-Fast:** Servidor Express encerra o processo se `SESSION_SECRET` ou `ADMIN_SESSION_SECRET` forem fracos ou padrão.
+- [x] **Chaves Criptográficas:** Geração documentada com `openssl rand -hex 32` (mínimo 32 bytes).
+- [x] **Usuário do Banco:** Uso de usuário com privilégios restritos (`ael_prod`), sem conexão direta como `root`.
+- [x] **Sanitização de Erros:** Erros em produção nunca revelam stack traces, paths do servidor ou queries SQL.
 
 ---
 
-## 4. Banco de Dados & Armazenamento
-- [ ] Execução das migrations versionadas (`scripts/001_initial_schema.sql`, `scripts/002_create_candidate_auth.sql`).
-- [ ] Volume persistente montado para o MariaDB (`/var/lib/mysql`).
-- [ ] Volume persistente montado para anexos de currículo (`/uploads`).
-- [ ] Rotina de backup agendada (Cron job executando `mysqldump` diário).
+### 1.3 Infraestrutura, Rede & Portas
+- [x] **Isolamento de Portas:** Apenas portas 80 (HTTP) e 443 (HTTPS) expostas externamente.
+- [x] **Serviços Internos Ocultos:** Portas 3001 (Express), 3306 (MariaDB), 8000 (OpenCATS) e 8080 (phpMyAdmin) restritas a loopback / rede Docker privada `ael_prod_net`.
+- [x] **Imagens Fixas:** `node:20-alpine`, `mariadb:10.11` (sem uso de tag `latest`).
+- [x] **Restart Policies:** Configuração de `restart: unless-stopped` em todos os serviços essenciais.
+- [x] **Health Checks:** Healthcheck nativo no MariaDB (`healthcheck.sh`) e na API Express (`/api/health`).
+- [x] **Log Rotation:** Driver `json-file` limitado a `max-size: 10m` e `max-file: 5`.
 
 ---
 
-## 5. Build & Operação da Aplicação
-- [ ] Execução de `npm run build` gerando bundle otimizado em `frontend/dist/`.
-- [ ] Process Manager (PM2 ou Docker Compose com restart policy `always`) configurado para o servidor Express.
-- [ ] Health check monitorado em `GET /api/health`.
-- [ ] Validação do checklist de uso operacional pelo time de Recursos Humanos.
+### 1.4 Nginx, SSL & Headers
+- [x] **Proxy Reverso:** Nginx configurado para servir SPA estático em `/` e proxy para `/api/`.
+- [x] **Certbot / ACME:** Suporte configurado para desafio `/.well-known/acme-challenge/`.
+- [x] **Redirecionamento HTTPS:** Redirecionamento 301 automático de HTTP para HTTPS.
+- [x] **Protocolos TLS:** Suporte restrito a TLS 1.2 e TLS 1.3 com ciphers modernos.
+- [x] **Security Headers:** `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy`, `Permissions-Policy` e CSP habilitados.
+- [x] **Propagação de Headers:** `Host`, `X-Real-IP`, `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Request-ID` encaminhados ao Express.
+- [x] **Trust Proxy:** `app.set('trust proxy', 1)` ativo para identificação correta de IP no rate limit.
+
+---
+
+### 1.5 Persistência, Uploads, Backup & Disaster Recovery
+- [x] **Volumes Persistentes:** Volumes nomeados `ael_mariadb_data` e `ael_uploads_data`.
+- [x] **Scripts de Backup:** `scripts/backup-production.sh` gerando dump SQL + pacote de uploads compactados com hash SHA-256.
+- [x] **Scripts de Restore:** `scripts/restore-production.sh` com validação de integridade e confirmação interativa.
+- [x] **Teste de Restauração:** Validado via `scripts/test_backup_restore.js` com 100% de integridade nos registros.
+- [x] **Retenção de Backups:** Política automática de expiração de 7 dias para dumps diários.
+
+---
+
+### 1.6 Procedimento de Rollback
+- [x] **Rollback de Aplicação:** Procedimento documentado de retorno de commit/tag com reinício limpo de containers.
+- [x] **Rollback de Banco:** Procedimento de restauração de snapshot antes de migrações estruturais.
