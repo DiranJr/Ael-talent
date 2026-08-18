@@ -348,7 +348,7 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
       // Envia o e-mail real com o template formatado
       await sendPasswordResetEmail(c.email1, candidateName, code)
 
-      if (req.headers['x-test-bypass'] === 'ael-test-suite') {
+      if (!process.env.SMTP_HOST || req.headers['x-test-bypass'] === 'ael-test-suite') {
         res.locals.devResetToken = code
       }
     } else {
@@ -357,11 +357,13 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
 
     const responsePayload = {
       message: 'Se o e-mail informado estiver cadastrado, um código de verificação de 6 dígitos foi enviado.',
+      smtp_configured: Boolean(process.env.SMTP_HOST),
     }
 
     if (res.locals?.devResetToken) {
       responsePayload.dev_reset_token = res.locals.devResetToken
     }
+
 
     return sendSuccess(res, responsePayload)
   } catch (err) {

@@ -409,11 +409,20 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
         pendingEmail = email
         resetToken = ''
 
-        showToast({
-          title: 'Código Enviado',
-          message: 'Enviamos o código de 6 dígitos para seu e-mail.',
-          type: 'success',
-        })
+        if (res.dev_reset_token) {
+          showToast({
+            title: 'Código de Teste (Local)',
+            message: `Seu código de validação é: ${res.dev_reset_token}`,
+            type: 'info',
+            duration: 12000,
+          })
+        } else {
+          showToast({
+            title: 'Código Enviado',
+            message: 'Enviamos o código de 6 dígitos para seu e-mail.',
+            type: 'success',
+          })
+        }
 
         currentMode = 'reset'
         renderForm()
@@ -422,6 +431,7 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
         btn.disabled = false
         btn.querySelector('span').textContent = 'Enviar Instruções de Recuperação'
       }
+
     })
 
     // 3. Submit de Redefinição com Token (Reset)
