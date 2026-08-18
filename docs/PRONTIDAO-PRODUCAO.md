@@ -100,9 +100,10 @@ NGINX REVERSE PROXY (Host)
 
 ## 9. DOCUMENTAÇÃO OPERACIONAL CRIADA
 
-1. [`docs/DEPLOYMENT.md`](file:///c:/Users/Diran.junior.AEL0/Documents/ael-talent-starter/ael-talent-starter/docs/DEPLOYMENT.md) — Guia de instalação passo a passo no Debian/Ubuntu.
-2. [`docs/BACKUP-RESTORE.md`](file:///c:/Users/Diran.junior.AEL0/Documents/ael-talent-starter/ael-talent-starter/docs/BACKUP-RESTORE.md) — Runbook de backup e disaster recovery.
-3. [`docs/PRODUCTION-CHECKLIST.md`](file:///c:/Users/Diran.junior.AEL0/Documents/ael-talent-starter/ael-talent-starter/docs/PRODUCTION-CHECKLIST.md) — Checklist pré-flight para liberação de produção.
+1. [`docs/IMPLANTACAO.md`](file:///c:/Users/Diran.junior.AEL0/Documents/ael-talent-starter/ael-talent-starter/docs/IMPLANTACAO.md) — Guia de instalação passo a passo no Debian/Ubuntu.
+2. [`docs/BACKUP-RESTAURACAO.md`](file:///c:/Users/Diran.junior.AEL0/Documents/ael-talent-starter/ael-talent-starter/docs/BACKUP-RESTAURACAO.md) — Runbook de backup e disaster recovery.
+3. [`docs/CHECKLIST-PRODUCAO.md`](file:///c:/Users/Diran.junior.AEL0/Documents/ael-talent-starter/ael-talent-starter/docs/CHECKLIST-PRODUCAO.md) — Checklist pré-flight para liberação de produção.
+
 4. [`.env.production.example`](file:///c:/Users/Diran.junior.AEL0/Documents/ael-talent-starter/ael-talent-starter/.env.production.example) — Modelo de variáveis de ambiente.
 
 ---

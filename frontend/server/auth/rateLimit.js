@@ -74,14 +74,17 @@ const emailRequestTimestamps = new Map()
 
 // Limpa entradas antigas a cada 10 minutos
 if (typeof setInterval !== 'undefined') {
-  setInterval(() => {
-    const now = Date.now()
-    for (const [key, timestamp] of emailRequestTimestamps.entries()) {
-      if (now - timestamp > 10 * 60 * 1000) {
-        emailRequestTimestamps.delete(key)
+  setInterval(
+    () => {
+      const now = Date.now()
+      for (const [key, timestamp] of emailRequestTimestamps.entries()) {
+        if (now - timestamp > 10 * 60 * 1000) {
+          emailRequestTimestamps.delete(key)
+        }
       }
-    }
-  }, 10 * 60 * 1000).unref?.()
+    },
+    10 * 60 * 1000
+  ).unref?.()
 }
 
 /**

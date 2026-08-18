@@ -16,7 +16,7 @@ export async function renderAdminDashboard(params, appEl) {
 
   // Renderiza Skeleton imediato dentro do Layout Administrativo
   appEl.innerHTML = renderAdminLayout(renderDashboardSkeleton(), {
-    title: 'Dashboard de Recrutamento',
+    title: 'Painel de Recrutamento',
     activeRoute: '/admin',
     topActionsHtml: topActions,
   })
@@ -195,7 +195,7 @@ export async function renderAdminDashboard(params, appEl) {
   `
 
   appEl.innerHTML = renderAdminLayout(content, {
-    title: 'Dashboard de Recrutamento',
+    title: 'Painel de Recrutamento',
     activeRoute: '/admin',
     topActionsHtml: topActions,
   })
