@@ -69,8 +69,8 @@ router.post('/', requireSuperAdmin, async (req, res) => {
     return sendError(res, 'Preencha usuário, nome, sobrenome e senha obrigatórios.', 400)
   }
 
-  if (password.length < 6) {
-    return sendError(res, 'A senha deve conter no mínimo 6 caracteres.', 400)
+  if (password.length < 8) {
+    return sendError(res, 'A senha deve conter no mínimo 8 caracteres.', 400)
   }
 
   const cleanUserName = user_name.trim().toLowerCase()
@@ -147,8 +147,8 @@ router.put('/:id', requireSuperAdmin, async (req, res) => {
       params.push(level)
     }
     if (password && password.trim()) {
-      if (password.length < 6) {
-        return sendError(res, 'A nova senha deve ter no mínimo 6 caracteres.', 400)
+      if (password.trim().length < 8) {
+        return sendError(res, 'A nova senha deve ter no mínimo 8 caracteres.', 400)
       }
       const hashedPassword = await bcrypt.hash(password.trim(), 10)
       updates.push('password = ?')

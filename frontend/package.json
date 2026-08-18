@@ -8,7 +8,12 @@
     "build": "vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
-    "dev:all": "concurrently \"npm run server\" \"npm run dev\""
+    "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
+    "test:audit": "node test_audit_suite.js",
+    "test:hardening": "node test_hardening_suite.js",
+    "test:homologation": "node test_homologation_suite.js",
+    "test:recruiter": "node test_recruiter_feature.js",
+    "test:all": "node test_hardening_suite.js && node test_audit_suite.js && node test_homologation_suite.js && node test_recruiter_feature.js"
   },
   "devDependencies": {
     "concurrently": "^9.2.4",

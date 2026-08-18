@@ -116,6 +116,7 @@ async function runHomologationSuite() {
       driver_license: 'D',
       can_relocate: '1',
       experience_years: '3 a 5 anos',
+      key_skills: 'Datamine, AutoCAD, CAT 336',
       consent_lgpd: '1',
       educations: JSON.stringify([{ level: 'Ensino Médio', course: 'Geral', institution: 'Escola Estadual', year: '2018', status: 'Concluído' }]),
       experiences: JSON.stringify([{ role: 'Operador de Escavadeira', company: 'Mineração Local', period: '2020 - 2024', activities: 'Operação de CAT 336' }])
@@ -139,13 +140,35 @@ async function runHomologationSuite() {
     results.push({ test: '1. Banco de Talentos SEM Currículo', status: 'FALHOU', detail: err.message })
   }
 
+function createValidPdfBuffer(title = 'Curriculo do Candidato - A&L Talent') {
+  const contentStream = `BT\n/F1 16 Tf\n50 720 Td\n(${title.replace(/[()]/g, '')}) Tj\nET`
+  const streamLen = Buffer.byteLength(contentStream)
+  const header = '%PDF-1.4\n'
+  const obj1 = '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n'
+  const obj2 = '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n'
+  const obj3 = '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> >>\nendobj\n'
+  const obj4 = `4 0 obj\n<< /Length ${streamLen} >>\nstream\n${contentStream}\nendstream\nendobj\n`
+
+  const offset1 = Buffer.byteLength(header)
+  const offset2 = offset1 + Buffer.byteLength(obj1)
+  const offset3 = offset2 + Buffer.byteLength(obj2)
+  const offset4 = offset3 + Buffer.byteLength(obj3)
+  const xrefOffset = offset4 + Buffer.byteLength(obj4)
+
+  const pad = (n) => String(n).padStart(10, '0')
+  const xref = `xref\n0 5\n0000000000 65535 f \n${pad(offset1)} 00000 n \n${pad(offset2)} 00000 n \n${pad(offset3)} 00000 n \n${pad(offset4)} 00000 n \n`
+  const trailer = `trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`
+
+  return Buffer.from(header + obj1 + obj2 + obj3 + obj4 + xref + trailer, 'utf8')
+}
+
   // ──────────────────────────────────────────────────────────────────
   // TESTE 2: Banco de Talentos COM Currículo PDF e DOCX
   // ──────────────────────────────────────────────────────────────────
   console.log('--- TESTE 2: Cadastro no Banco de Talentos COM Currículo PDF e DOCX ---')
   try {
     const email2 = `candidato.compdf.${Date.now()}@ael.dev`
-    const fakePdfBuffer = Buffer.from('%PDF-1.4 Fake PDF Content for Homologation Testing')
+    const fakePdfBuffer = createValidPdfBuffer('Curriculo Renata Silva - Engenharia A&L')
     const { body: pdfBody, contentType: pdfType } = buildMultipartFormData({
       first_name: 'Renata',
       last_name: 'Silva Com PDF',
@@ -405,6 +428,10 @@ async function runHomologationSuite() {
     const candId = 23 // Larissa Ramos (Cadastrada apenas no Banco de Talentos)
     const jobId  = 3  // Engenheiro Civil
 
+    // Limpa associação prévia para garantir idempotência em reexecuções
+    await db.query('DELETE FROM candidate_joborder_status_history WHERE candidate_id = ? AND joborder_id = ?', [candId, jobId])
+    await db.query('DELETE FROM candidate_joborder WHERE candidate_id = ? AND joborder_id = ?', [candId, jobId])
+
     const assignRes = await apiRequest({
       method: 'POST',
       path: `/api/talent-pool/candidates/${candId}/assign-job`,
@@ -619,6 +646,12 @@ async function runHomologationSuite() {
 
   const allPassed = results.every(r => r.status === 'APROVADO')
   console.log(`\nStatus Geral da Homologação: ${allPassed ? '✅ 100% APROVADO' : '❌ FALHAS ENCONTRADAS'}\n`)
+
+  await db.end()
+  process.exit(allPassed ? 0 : 1)
 }
 
-runHomologationSuite().catch(console.error)
+runHomologationSuite().catch((err) => {
+  console.error(err)
+  process.exit(1)
+})

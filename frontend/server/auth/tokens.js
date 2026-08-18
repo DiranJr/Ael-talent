@@ -9,9 +9,15 @@ const isProd = process.env.NODE_ENV === 'production'
 const CANDIDATE_SECRET = process.env.SESSION_SECRET || 'ael_talent_candidate_secret_2024'
 const ADMIN_SECRET     = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || 'ael_talent_admin_secret_2024'
 
-if (isProd && (CANDIDATE_SECRET === 'ael_talent_candidate_secret_2024' || ADMIN_SECRET === 'ael_talent_admin_secret_2024')) {
-  console.error('❌ CRÍTICO: SESSION_SECRET e ADMIN_SESSION_SECRET padrão detectados em ambiente de produção!')
-  process.exit(1)
+if (isProd) {
+  if (CANDIDATE_SECRET === 'ael_talent_candidate_secret_2024' || CANDIDATE_SECRET.length < 32) {
+    console.error('❌ CRÍTICO: SESSION_SECRET fraco (< 32 chars) ou padrão detectado em ambiente de produção!')
+    process.exit(1)
+  }
+  if (ADMIN_SECRET === 'ael_talent_admin_secret_2024' || ADMIN_SECRET.length < 32) {
+    console.error('❌ CRÍTICO: ADMIN_SESSION_SECRET fraco (< 32 chars) ou padrão detectado em ambiente de produção!')
+    process.exit(1)
+  }
 }
 
 const CANDIDATE_EXP_MS = 30 * 24 * 60 * 60 * 1000 // 30 dias
@@ -31,17 +37,24 @@ export function signCandidateToken(payload) {
 }
 
 /**
- * Valida token do candidato
+ * Valida token do candidato de forma timing-safe
  */
 export function verifyCandidateToken(token) {
-  if (!token || typeof token !== 'string' || !token.includes('.')) return null
-  const [data, sig] = token.split('.')
+  if (!token || typeof token !== 'string') return null
+  const parts = token.split('.')
+  if (parts.length !== 2) return null
+  const [data, sig] = parts
+  if (!data || !sig) return null
+
   const expectedSig = crypto.createHmac('sha256', CANDIDATE_SECRET).update(data).digest('base64url')
-  if (sig !== expectedSig) return null
+  const a = Buffer.from(sig)
+  const b = Buffer.from(expectedSig)
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null
 
   try {
     const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'))
-    if (!payload.exp || Date.now() > payload.exp) return null
+    if (!payload || typeof payload !== 'object') return null
+    if (!payload.exp || typeof payload.exp !== 'number' || Date.now() > payload.exp) return null
     if (!payload.candidate_id) return null
     return payload
   } catch {
@@ -63,17 +76,24 @@ export function signAdminToken(payload) {
 }
 
 /**
- * Valida token administrativo
+ * Valida token administrativo de forma timing-safe
  */
 export function verifyAdminToken(token) {
-  if (!token || typeof token !== 'string' || !token.includes('.')) return null
-  const [data, sig] = token.split('.')
+  if (!token || typeof token !== 'string') return null
+  const parts = token.split('.')
+  if (parts.length !== 2) return null
+  const [data, sig] = parts
+  if (!data || !sig) return null
+
   const expectedSig = crypto.createHmac('sha256', ADMIN_SECRET).update(data).digest('base64url')
-  if (sig !== expectedSig) return null
+  const a = Buffer.from(sig)
+  const b = Buffer.from(expectedSig)
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return null
 
   try {
     const payload = JSON.parse(Buffer.from(data, 'base64url').toString('utf8'))
-    if (!payload.exp || Date.now() > payload.exp) return null
+    if (!payload || typeof payload !== 'object') return null
+    if (!payload.exp || typeof payload.exp !== 'number' || Date.now() > payload.exp) return null
     if (!payload.user_id) return null
     return payload
   } catch {

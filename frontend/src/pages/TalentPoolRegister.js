@@ -729,8 +729,8 @@ export async function renderTalentPoolRegister(params, appEl) {
           showToast({ title: 'Atenção', message: 'Informe sua cidade.', type: 'error' })
           return false
         }
-        if (!formData.password || formData.password.length < 6) {
-          showToast({ title: 'Senha Obrigatória', message: 'Crie uma senha com no mínimo 6 caracteres para seu perfil.', type: 'error' })
+        if (!formData.password || formData.password.length < 8) {
+          showToast({ title: 'Senha Obrigatória', message: 'Crie uma senha com no mínimo 8 caracteres para seu perfil.', type: 'error' })
           return false
         }
         if (formData.password !== formData.password_confirm) {
@@ -784,31 +784,6 @@ export async function renderTalentPoolRegister(params, appEl) {
   }
 
   function bindEvents() {
-    // Lookup automático de e-mail ao sair do campo (onBlur)
-    const emailInput = document.getElementById('tp-email')
-    emailInput?.addEventListener('blur', async () => {
-      const email = emailInput.value.trim()
-      if (email && email.includes('@') && !lookupDone) {
-        try {
-          const res = await lookupCandidate(email)
-          if (res?.found) {
-            lookupDone = true
-            if (res.first_name && !formData.first_name) {
-              formData.first_name = res.first_name
-            }
-            showToast({
-              title: 'Cadastro Identificado',
-              message: `Olá${res.first_name ? ', ' + res.first_name : ''}! Seu cadastro será atualizado automaticamente ao concluir.`,
-              type: 'info'
-            })
-            render()
-          }
-        } catch (e) {
-          console.log('Lookup silenciado:', e.message)
-        }
-      }
-    })
-
     // Adicionar / Remover Formações
     document.getElementById('add-education-btn')?.addEventListener('click', () => {
       saveCurrentStepData()

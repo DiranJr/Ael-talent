@@ -13,9 +13,20 @@ export async function adminGetJobsHandler(req, res) {
   try {
     const db = await getDb()
     const { status = '', search = '', recruiter = '' } = req.query
+    const user = req.adminUser || {}
+    const isAdmin = (user.access_level || 0) >= 400
 
     let where = 'WHERE 1=1'
     const params = []
+
+    // Regra: se não for admin, só pode ver vagas designadas para ele OU vagas sem recrutador designado
+    if (!isAdmin && user.user_id) {
+      where += ' AND (jo.recruiter = ? OR jo.recruiter IS NULL OR jo.recruiter = 0)'
+      params.push(user.user_id)
+    } else if (recruiter) {
+      where += ' AND jo.recruiter = ?'
+      params.push(parseInt(recruiter, 10))
+    }
 
     if (status === 'active') {
       where += " AND (jo.status = 'Active-Share' OR jo.public = 1)"
@@ -23,11 +34,6 @@ export async function adminGetJobsHandler(req, res) {
       where += " AND (jo.status = 'Closed' OR jo.status = 'Canceled')"
     } else if (status === 'hold') {
       where += " AND jo.status = 'On Hold'"
-    }
-
-    if (recruiter) {
-      where += ' AND jo.recruiter = ?'
-      params.push(parseInt(recruiter, 10))
     }
 
     if (search) {
@@ -294,6 +300,12 @@ export async function adminToggleJobStatusHandler(req, res) {
  * Exclui vaga e remove candidaturas vinculadas
  */
 export async function adminDeleteJobHandler(req, res) {
+  const user = req.adminUser || {}
+  const isAdmin = (user.access_level || 0) >= 400
+  if (!isAdmin) {
+    return sendError(res, 'Apenas Administradores do RH podem excluir vagas permanentemente. Recrutadores podem apenas pausar ou encerrar a vaga.', 403)
+  }
+
   let conn
   try {
     const id = parseInt(req.params.id)

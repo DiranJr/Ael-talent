@@ -2,7 +2,7 @@
  * A&L Talent Admin — Dashboard Principal do RH
  */
 
-import { adminGetStats } from '../../api.js'
+import { adminGetStats, getAttachmentDownloadUrl } from '../../api.js'
 import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
 import { navigate } from '../../router.js'
 
@@ -108,11 +108,11 @@ export async function renderAdminDashboard(params, appEl) {
                   <td>
                     <div class="table-actions">
                       ${app.phone_cell ? `
-                        <a href="https://wa.me/55${app.phone_cell.replace(/\\D/g,'')}" target="_blank" class="btn-icon whatsapp" title="Conversar no WhatsApp">
+                        <a href="https://wa.me/55${app.phone_cell.replace(/\D/g,'')}" target="_blank" class="btn-icon whatsapp" title="Conversar no WhatsApp">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
                         </a>` : ''}
                       ${app.attachment_id ? `
-                        <a href="/api/admin/attachments/${app.attachment_id}/download" target="_blank" class="btn-icon" title="Ver Currículo">
+                        <a href="${getAttachmentDownloadUrl(app.attachment_id)}" target="_blank" rel="noopener" class="btn-icon" title="Ver Currículo">
                           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                         </a>` : ''}
                     </div>

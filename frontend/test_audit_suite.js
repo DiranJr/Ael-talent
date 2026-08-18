@@ -9,10 +9,14 @@ const BASE_URL = 'http://localhost:3001'
 
 async function request(urlPath, options = {}) {
   const url = new URL(`${BASE_URL}${urlPath}`)
+  const headers = {
+    'x-test-bypass': 'ael-test-suite',
+    ...(options.headers || {}),
+  }
   return new Promise((resolve, reject) => {
     const req = http.request(url, {
       method: options.method || 'GET',
-      headers: options.headers || {},
+      headers,
     }, (res) => {
       let data = ''
       res.on('data', chunk => data += chunk)
@@ -290,14 +294,18 @@ async function runTests() {
     detail: `Tentativa sem autenticação bloqueada com status: ${setPwdNoAuth.status}`
   })
 
-  // ─── TESTE 9: Proteção de PII no Lookup ─────────────────────────
+  // ─── TESTE 9: Proteção de PII e Anti-Enumeração no Lookup ─────────
   console.log('--- TESTE 9: Proteção de Dados Pessoais em /lookup ---')
   const lookupRes = await request(`/api/talent-pool/lookup?email=${encodeURIComponent(cleanTestEmail)}`)
-  const lookupSafe = lookupRes.status === 200 && lookupRes.body?.found === true && !lookupRes.body?.candidate?.phone && !lookupRes.body?.phone
+  const lookupSafe = lookupRes.status === 200 &&
+    lookupRes.body?.status === 'ok' &&
+    lookupRes.body?.first_name === undefined &&
+    lookupRes.body?.candidate_id === undefined &&
+    lookupRes.body?.has_password === undefined
   results.push({
-    test: '9. Proteção de Dados Pessoais em Lookup Público',
+    test: '9. Proteção de Dados Pessoais e Anti-Enumeração em Lookup Público',
     status: lookupSafe ? 'APROVADO' : 'FALHOU',
-    detail: `Lookup retorna apenas boolean e primeiro nome, sem expor PII`
+    detail: `Lookup retorna resposta uniforme status: ok sem expor PII ou enumeração de e-mails`
   })
 
   // ─── TESTE 10: Headers de Segurança ─────────────────────────────

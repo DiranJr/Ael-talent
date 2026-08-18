@@ -9,6 +9,7 @@ import {
   adminAssignCandidateToJob,
   adminGetJobs,
   adminGetDepartments,
+  getAttachmentDownloadUrl,
 } from '../../api.js'
 import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
 import { navigate } from '../../router.js'
@@ -256,15 +257,15 @@ function renderCandidatesRows(candidates) {
               </a>` : ''}
 
             ${c.attachment_id ? `
-              <a href="/api/admin/attachments/${c.attachment_id}/download" target="_blank" class="btn-icon" title="Baixar Currículo">
+              <a href="${getAttachmentDownloadUrl(c.attachment_id)}" target="_blank" rel="noopener" class="btn-icon" title="Baixar Currículo">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
               </a>` : ''}
 
-            <button class="btn-icon view-detail-btn" data-id="${c.candidate_id}" title="Ver Perfil Completo">
+            <button type="button" class="btn-icon view-detail-btn" data-id="${c.candidate_id}" title="Ver Perfil Completo">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
             </button>
 
-            <button class="btn btn-sm btn-primary assign-job-btn" data-id="${c.candidate_id}" data-name="${escAttr(c.full_name)}" data-area="${escAttr(c.interest_area || '')}" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; gap: 0.25rem;">
+            <button type="button" class="btn btn-sm btn-primary assign-job-btn" data-id="${c.candidate_id}" data-name="${escAttr(c.full_name)}" data-area="${escAttr(c.interest_area || '')}" style="padding: 0.35rem 0.65rem; font-size: 0.75rem; gap: 0.25rem;">
               <span>+ Vaga</span>
             </button>
           </div>
@@ -291,9 +292,10 @@ function bindTalentPoolEvents(appEl, initialCandidates, jobs) {
         education: eduSelect?.value || '',
       })
       candidates = res.candidates || []
-      document.getElementById('tp-tbody').innerHTML = renderCandidatesRows(candidates)
-      document.getElementById('tp-count').textContent = `(${candidates.length} encontrados)`
-      bindRowButtons()
+      const tbody = document.getElementById('tp-tbody')
+      const countEl = document.getElementById('tp-count')
+      if (tbody) tbody.innerHTML = renderCandidatesRows(candidates)
+      if (countEl) countEl.textContent = `(${candidates.length} encontrados)`
     } catch (err) {
       showToast({ title: 'Erro', message: err.message, type: 'error' })
     }
@@ -312,82 +314,127 @@ function bindTalentPoolEvents(appEl, initialCandidates, jobs) {
   const detailModal = document.getElementById('tp-detail-modal')
   const assignModal = document.getElementById('tp-assign-modal')
 
-  document.getElementById('close-detail-modal-btn')?.addEventListener('click', () => { detailModal.style.display = 'none' })
-  document.getElementById('close-assign-modal-btn')?.addEventListener('click', () => { assignModal.style.display = 'none' })
-  document.getElementById('cancel-assign-btn')?.addEventListener('click', () => { assignModal.style.display = 'none' })
+  // Delegação de cliques para botões e modais
+  appEl.addEventListener('click', async (e) => {
+    // 1. Ver Detalhes
+    const viewBtn = e.target.closest('.view-detail-btn')
+    if (viewBtn) {
+      const id = viewBtn.dataset.id
+      if (!id || !detailModal) return
+      detailModal.style.display = 'flex'
+      const bodyEl = document.getElementById('modal-cand-body')
+      const titleEl = document.getElementById('modal-cand-title')
+      if (bodyEl) bodyEl.innerHTML = '<div style="text-align: center; padding: 2.5rem; color: var(--ael-muted);">Carregando perfil completo...</div>'
 
-  function bindRowButtons() {
-    // Ver Detalhes
-    appEl.querySelectorAll('.view-detail-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const id = btn.dataset.id
-        detailModal.style.display = 'flex'
-        document.getElementById('modal-cand-body').innerHTML = '<div style="text-align: center; padding: 2rem;">Carregando perfil...</div>'
+      try {
+        const res = await adminGetTalentPoolCandidateDetail(id)
+        const cand = res.candidate
+        if (titleEl) titleEl.textContent = cand.full_name || 'Perfil Profissional'
+        if (bodyEl) bodyEl.innerHTML = renderCandidateDetailHtml(cand)
+      } catch (err) {
+        if (bodyEl) bodyEl.innerHTML = `<div style="color: var(--ael-red); padding: 1.5rem; text-align: center;">${err.message}</div>`
+      }
+      return
+    }
 
-        try {
-          const res = await adminGetTalentPoolCandidateDetail(id)
-          const cand = res.candidate
-          document.getElementById('modal-cand-title').textContent = cand.full_name
-          document.getElementById('modal-cand-body').innerHTML = renderCandidateDetailHtml(cand)
-        } catch (err) {
-          document.getElementById('modal-cand-body').innerHTML = `<div style="color: var(--ael-red); padding: 1rem;">${err.message}</div>`
-        }
-      })
-    })
+    // 2. Adicionar a Vaga (+ Vaga)
+    const assignBtn = e.target.closest('.assign-job-btn')
+    if (assignBtn) {
+      if (!assignModal) return
+      const candId = document.getElementById('assign-cand-id')
+      const candName = document.getElementById('assign-cand-name')
+      const candSub = document.getElementById('assign-cand-sub')
+      if (candId) candId.value = assignBtn.dataset.id || ''
+      if (candName) candName.textContent = assignBtn.dataset.name || 'Candidato'
+      if (candSub) candSub.textContent = `Área: ${assignBtn.dataset.area || 'Geral'}`
+      assignModal.style.display = 'flex'
+      return
+    }
 
-    // Adicionar a Vaga
-    appEl.querySelectorAll('.assign-job-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.getElementById('assign-cand-id').value = btn.dataset.id
-        document.getElementById('assign-cand-name').textContent = btn.dataset.name
-        document.getElementById('assign-cand-sub').textContent = `Área: ${btn.dataset.area || 'Geral'}`
-        assignModal.style.display = 'flex'
-      })
-    })
-  }
+    // 3. Fechar modais ao clicar no backdrop ou botão de fechar
+    if (detailModal && (e.target === detailModal || e.target.closest('#close-detail-modal-btn'))) {
+      detailModal.style.display = 'none'
+      return
+    }
+
+    if (assignModal && (e.target === assignModal || e.target.closest('#close-assign-modal-btn') || e.target.closest('#cancel-assign-btn'))) {
+      assignModal.style.display = 'none'
+      return
+    }
+  })
 
   // Confirmar vínculo à vaga
-  document.getElementById('confirm-assign-btn')?.addEventListener('click', async () => {
-    const candidateId = document.getElementById('assign-cand-id').value
-    const jobId       = document.getElementById('assign-job-select').value
-    const status      = document.getElementById('assign-status-select').value
+  document.getElementById('confirm-assign-btn')?.addEventListener('click', async (e) => {
+    e.preventDefault()
+    const candidateId = document.getElementById('assign-cand-id')?.value
+    const jobId       = document.getElementById('assign-job-select')?.value
+    const status      = document.getElementById('assign-status-select')?.value || 100
 
     if (!jobId) {
-      showToast({ title: 'Atenção', message: 'Selecione uma oportunidade.', type: 'error' })
+      showToast({ title: 'Atenção', message: 'Selecione uma oportunidade para vincular o profissional.', type: 'error' })
       return
+    }
+
+    const confirmBtn = document.getElementById('confirm-assign-btn')
+    if (confirmBtn) {
+      confirmBtn.disabled = true
+      confirmBtn.textContent = 'Vinculando...'
     }
 
     try {
       const res = await adminAssignCandidateToJob(candidateId, jobId, status)
       showToast({ title: 'Sucesso', message: res.message, type: 'success' })
-      assignModal.style.display = 'none'
-      refetch()
+      if (assignModal) assignModal.style.display = 'none'
+      await refetch()
     } catch (err) {
       showToast({ title: 'Erro ao Vincular', message: err.message, type: 'error' })
+    } finally {
+      if (confirmBtn) {
+        confirmBtn.disabled = false
+        confirmBtn.textContent = 'Vincular ao Processo'
+      }
     }
   })
-
-  bindRowButtons()
 }
 
 function renderCandidateDetailHtml(c) {
   const ex = c.extra_fields || {}
   const apps = c.applications || []
   const acts = c.activities || []
+  const atts = c.attachments || []
+  const mainAttachmentId = c.attachment_id || atts[0]?.attachment_id
+  const skills = Array.isArray(c.key_skills)
+    ? c.key_skills
+    : (typeof c.key_skills === 'string' && c.key_skills.trim()
+        ? c.key_skills.split(',').map(s => s.trim()).filter(Boolean)
+        : [])
 
   return `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
       <div>
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">E-mail & Telefone</span>
-        <strong>${escHtml(c.email1)}</strong><br>
-        <span>${escHtml(c.phone_cell || 'Sem telefone')}</span>
+        <strong>${escHtml(c.email1 || c.email)}</strong><br>
+        <span>${escHtml(c.phone_cell || c.phone || 'Sem telefone')}</span>
       </div>
       <div>
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem;">Localização & Disponibilidade</span>
-        <strong>${escHtml(c.city)} - ${escHtml(c.state)}</strong><br>
+        <strong>${escHtml(c.city || 'Não informada')} - ${escHtml(c.state || 'PA')}</strong><br>
         <span>Mudança: ${c.can_relocate ? 'Sim' : 'Não'} · Viagens: ${escHtml(ex['Disponibilidade para Viagens'] || 'Não informado')}</span>
       </div>
     </div>
+
+    ${mainAttachmentId ? `
+      <div style="margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: center; background: rgba(0, 91, 58, 0.06); padding: 0.75rem 1rem; border-radius: var(--ael-radius-md); border: 1px solid rgba(0, 91, 58, 0.15);">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--ael-green-base); flex-shrink: 0;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div style="flex: 1;">
+          <div style="font-weight: 700; font-size: 0.875rem; color: var(--ael-ink);">Currículo Anexado</div>
+          <div style="font-size: 0.75rem; color: var(--ael-muted);">${escHtml(c.original_filename || atts[0]?.original_filename || 'Documento do Candidato')}</div>
+        </div>
+        <a href="${getAttachmentDownloadUrl(mainAttachmentId)}" target="_blank" rel="noopener" class="btn btn-sm btn-primary" style="gap: 0.35rem; font-size: 0.75rem; padding: 0.35rem 0.75rem;">
+          📄 Abrir / Baixar
+        </a>
+      </div>
+    ` : ''}
 
     <div style="background: var(--ael-surface); border-radius: var(--ael-radius-md); padding: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
@@ -411,13 +458,13 @@ function renderCandidateDetailHtml(c) {
       </div>
     ` : ''}
 
-    ${c.key_skills ? `
+    ${skills.length ? `
       <div style="margin-bottom: 1.25rem;">
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem; margin-bottom: 0.35rem;">Competências Técnicas</span>
         <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
-          ${c.key_skills.split(',').map(s => `
+          ${skills.map(s => `
             <span style="background: rgba(0,91,58,0.1); color: var(--ael-green-dark); font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 600;">
-              ${escHtml(s.trim())}
+              ${escHtml(String(s).trim())}
             </span>
           `).join('')}
         </div>

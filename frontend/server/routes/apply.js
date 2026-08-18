@@ -5,6 +5,7 @@
 
 import { getDb } from '../db.js'
 import { saveCandidateAttachment, sendSuccess, sendError } from '../helpers.js'
+import { validateUploadedFile } from '../upload.js'
 
 export async function applyHandler(req, res) {
   const {
@@ -18,6 +19,13 @@ export async function applyHandler(req, res) {
   } = req.body
 
   const resumeFile = req.file
+
+  if (resumeFile) {
+    const validation = await validateUploadedFile(resumeFile.path, resumeFile.originalname)
+    if (!validation.valid) {
+      return sendError(res, validation.error || 'Arquivo de currículo inválido.', 400)
+    }
+  }
 
   if (!name?.trim() || !email?.trim() || !phone?.trim() || !joborder_id) {
     return sendError(res, 'Preencha todos os campos obrigatórios: Nome, E-mail, Telefone e Vaga.', 400)
