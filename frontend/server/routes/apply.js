@@ -4,19 +4,11 @@
  */
 
 import { getDb } from '../db.js'
-import { saveCandidateAttachment, sendSuccess, sendError } from '../helpers.js'
+import { saveCandidateAttachment, sendError, sendSuccess } from '../helpers.js'
 import { validateUploadedFile } from '../upload.js'
 
 export async function applyHandler(req, res) {
-  const {
-    name,
-    email,
-    phone,
-    joborder_id,
-    city,
-    state,
-    message,
-  } = req.body
+  const { name, email, phone, joborder_id, city, state, message } = req.body
 
   const resumeFile = req.file
 
@@ -46,28 +38,32 @@ export async function applyHandler(req, res) {
     const cleanEmail = email.trim().toLowerCase()
 
     // 1. Verifica se o candidato já existe pelo e-mail
-    const [existing] = await conn.execute(
-      `SELECT candidate_id FROM candidate WHERE email1 = ? OR email2 = ? LIMIT 1`,
-      [cleanEmail, cleanEmail]
-    )
+    const [existing] = await conn.execute(`SELECT candidate_id FROM candidate WHERE email1 = ? OR email2 = ? LIMIT 1`, [
+      cleanEmail,
+      cleanEmail,
+    ])
 
     if (existing.length > 0) {
       candidateId = existing[0].candidate_id
-      await conn.execute(`
+      await conn.execute(
+        `
         UPDATE candidate SET
           phone_cell = COALESCE(NULLIF(?, ''), phone_cell),
           city = COALESCE(NULLIF(?, ''), city),
           state = COALESCE(NULLIF(?, ''), state),
           date_modified = NOW()
         WHERE candidate_id = ?
-      `, [phone.trim(), city?.trim() || null, state?.trim()?.toUpperCase() || null, candidateId])
+      `,
+        [phone.trim(), city?.trim() || null, state?.trim()?.toUpperCase() || null, candidateId]
+      )
     } else {
       // 2. Insere novo candidato nativo
       const nameParts = name.trim().split(/\s+/)
       const firstName = nameParts[0] || ''
-      const lastName  = nameParts.slice(1).join(' ') || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
 
-      const [insertResult] = await conn.execute(`
+      const [insertResult] = await conn.execute(
+        `
         INSERT INTO candidate (
           first_name,
           last_name,
@@ -81,15 +77,17 @@ export async function applyHandler(req, res) {
           entered_by,
           owner
         ) VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), 1, 1)
-      `, [
-        firstName,
-        lastName,
-        cleanEmail,
-        phone.trim(),
-        city?.trim()  || '',
-        state?.trim()?.toUpperCase() || '',
-        message?.trim() || '',
-      ])
+      `,
+        [
+          firstName,
+          lastName,
+          cleanEmail,
+          phone.trim(),
+          city?.trim() || '',
+          state?.trim()?.toUpperCase() || '',
+          message?.trim() || '',
+        ]
+      )
 
       candidateId = insertResult.insertId
     }
@@ -108,16 +106,21 @@ export async function applyHandler(req, res) {
         attachmentId = await saveCandidateAttachment(conn, candidateId, resumeFile)
       }
       await conn.commit()
-      return sendSuccess(res, {
-        candidate_id: candidateId,
-        attachment_id: attachmentId,
-        is_update: true,
-      }, 'Candidatura atualizada com sucesso!')
+      return sendSuccess(
+        res,
+        {
+          candidate_id: candidateId,
+          attachment_id: attachmentId,
+          is_update: true,
+        },
+        'Candidatura atualizada com sucesso!'
+      )
     }
 
     // 4. Cria a candidatura (candidate_joborder)
     // status 100 = No Contact (novo candidato no pipeline)
-    const [appResult] = await conn.execute(`
+    const [appResult] = await conn.execute(
+      `
       INSERT INTO candidate_joborder (
         candidate_id,
         joborder_id,
@@ -125,14 +128,21 @@ export async function applyHandler(req, res) {
         date_modified,
         status
       ) VALUES (?, ?, NOW(), NOW(), 100)
-    `, [candidateId, jobId])
+    `,
+      [candidateId, jobId]
+    )
 
     // 5. Registra no histórico de status do OpenCATS
-    await conn.execute(`
+    await conn
+      .execute(
+        `
       INSERT INTO candidate_joborder_status_history (
         candidate_id, joborder_id, date, status_from, status_to
       ) VALUES (?, ?, NOW(), 0, 100)
-    `, [candidateId, jobId]).catch(() => {})
+    `,
+        [candidateId, jobId]
+      )
+      .catch(() => {})
 
     // 6. Salva o currículo como attachment
     let attachmentId = null
@@ -141,7 +151,9 @@ export async function applyHandler(req, res) {
     }
 
     // 7. Registra atividade
-    await conn.execute(`
+    await conn
+      .execute(
+        `
       INSERT INTO activity (
         data_item_type,
         data_item_id,
@@ -153,20 +165,23 @@ export async function applyHandler(req, res) {
         type,
         notes
       ) VALUES (100, ?, ?, 1, NOW(), NOW(), NOW(), 100, ?)
-    `, [
-      candidateId,
-      jobId,
-      `Candidatura recebida pelo Portal A&L Talent para a vaga #${jobId}`,
-    ]).catch(() => {})
+    `,
+        [candidateId, jobId, `Candidatura recebida pelo Portal A&L Talent para a vaga #${jobId}`]
+      )
+      .catch(() => {})
 
     await conn.commit()
 
-    return sendSuccess(res, {
-      candidate_id: candidateId,
-      application_id: appResult.insertId,
-      attachment_id: attachmentId,
-    }, 'Candidatura enviada com sucesso!', 201)
-
+    return sendSuccess(
+      res,
+      {
+        candidate_id: candidateId,
+        application_id: appResult.insertId,
+        attachment_id: attachmentId,
+      },
+      'Candidatura enviada com sucesso!',
+      201
+    )
   } catch (err) {
     await conn.rollback()
     console.error('[/api/apply] Erro:', err.message)

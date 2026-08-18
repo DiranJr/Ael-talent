@@ -2,10 +2,13 @@
  * A&L Talent Admin — Layout Shell Component
  */
 
-import { getAdminToken, getAdminUser, clearAdminAuth } from '../api.js'
-import { navigate, getCurrentPath } from '../router.js'
+import { clearAdminAuth, getAdminToken, getAdminUser } from '../api.js'
+import { getCurrentPath, navigate } from '../router.js'
 
-export function renderAdminLayout(contentHtml, { title = 'Painel RH', activeRoute = '/admin', topActionsHtml = '' } = {}) {
+export function renderAdminLayout(
+  contentHtml,
+  { title = 'Painel RH', activeRoute = '/admin', topActionsHtml = '' } = {}
+) {
   const token = getAdminToken()
   if (!token) {
     navigate('/admin/login')
@@ -28,15 +31,17 @@ export function renderAdminLayout(contentHtml, { title = 'Painel RH', activeRout
     navItems.push({ label: 'Equipe & Acessos', route: '/admin/users', icon: userCheckIcon() })
   }
 
-  const sidebarNavHtml = navItems.map(item => {
-    const isActive = path === item.route || (item.route !== '/admin' && path.startsWith(item.route))
-    return `
+  const sidebarNavHtml = navItems
+    .map((item) => {
+      const isActive = path === item.route || (item.route !== '/admin' && path.startsWith(item.route))
+      return `
       <a href="#${item.route}" class="admin-nav-item ${isActive ? 'active' : ''}">
         ${item.icon}
         <span>${item.label}</span>
       </a>
     `
-  }).join('')
+    })
+    .join('')
 
   return `
     <div class="admin-shell">
@@ -128,7 +133,11 @@ export function bindAdminLayoutEvents(appEl) {
 
 /* ─── Helpers ─────────────────────────────────────────────── */
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function dashboardIcon() {

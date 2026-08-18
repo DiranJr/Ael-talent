@@ -1,0 +1,110 @@
+name: CI - Engineering Quality Foundation
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'chore/**'
+      - 'feature/**'
+      - 'fix/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  lint-and-unit:
+    name: Code Quality (Biome Lint + Vitest Unit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ./frontend/package-lock.json
+
+      - name: Instalar Dependências
+        run: npm ci
+
+      - name: Biome Linter & Format Check
+        run: npx biome check src server
+
+      - name: Vitest Unit Tests (Isolados sem DB)
+        run: npm run test:unit
+
+      - name: Vite Production Build
+        run: npm run build
+
+  integration-and-e2e:
+    name: Integration & E2E Tests (MariaDB)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    services:
+      mariadb:
+        image: mariadb:10.11
+        env:
+          MARIADB_ROOT_PASSWORD: cats_root_password
+          MARIADB_DATABASE: cats
+          MARIADB_USER: opencats
+          MARIADB_PASSWORD: cats_password
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - name: Checkout Código
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: ./frontend/package-lock.json
+
+      - name: Instalar Dependências
+        run: npm ci
+
+      - name: Inicializar Schema OpenCATS no MariaDB
+        run: |
+          if [ -f ../opencats/INSTALL_SCHEMA.sql ]; then
+            mariadb -h 127.0.0.1 -u opencats -pcats_password cats < ../opencats/INSTALL_SCHEMA.sql
+          elif [ -f ../schema.sql ]; then
+            mariadb -h 127.0.0.1 -u opencats -pcats_password cats < ../schema.sql
+          fi
+
+      - name: Executar Testes de Integração & Homologação
+        env:
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: opencats
+          DB_PASS: cats_password
+          DB_NAME: cats
+        run: |
+          node server/index.js &
+          sleep 3
+          npm run test:all
+
+      - name: Instalar Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Executar Testes E2E (Playwright)
+        env:
+          NODE_ENV: test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: opencats
+          DB_PASS: cats_password
+          DB_NAME: cats
+        run: npm run test:e2e

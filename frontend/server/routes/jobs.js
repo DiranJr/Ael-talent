@@ -4,7 +4,7 @@
  */
 
 import { getDb } from '../db.js'
-import { sendSuccess, sendError } from '../helpers.js'
+import { sendError, sendSuccess } from '../helpers.js'
 
 /**
  * GET /api/jobs?q=...&department=...&location=...
@@ -82,7 +82,8 @@ export async function jobDetailHandler(req, res) {
       return sendError(res, 'ID de vaga inválido.', 400)
     }
 
-    const [rows] = await db.execute(`
+    const [rows] = await db.execute(
+      `
       SELECT
         jo.joborder_id,
         jo.title,
@@ -107,7 +108,9 @@ export async function jobDetailHandler(req, res) {
         jo.joborder_id = ?
         AND (jo.status = 'Active-Share' OR jo.public = 1)
       LIMIT 1
-    `, [id])
+    `,
+      [id]
+    )
 
     if (!rows.length) {
       return sendError(res, 'Vaga não encontrada ou não está publicada.', 404)
@@ -152,12 +155,12 @@ export async function filtersHandler(req, res) {
       ORDER BY city ASC, state ASC
     `)
 
-    const departments = deptRows.map(r => ({
+    const departments = deptRows.map((r) => ({
       value: r.name,
       label: r.name,
     }))
 
-    const locations = locRows.map(r => {
+    const locations = locRows.map((r) => {
       const label = [r.city, r.state].filter(Boolean).join(' - ')
       return {
         value: r.city,

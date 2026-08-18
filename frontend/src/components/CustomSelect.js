@@ -22,7 +22,7 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
   wrap.id = id
 
   let currentValue = value
-  let currentLabel = items.find(i => i.value === value)?.label || items[0]?.label || label
+  let currentLabel = items.find((i) => i.value === value)?.label || items[0]?.label || label
 
   function getHtml() {
     return `
@@ -43,7 +43,9 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
       </button>
 
       <div class="custom-select__dropdown" role="listbox" aria-labelledby="${id}-btn" id="${id}-list">
-        ${items.map(item => `
+        ${items
+          .map(
+            (item) => `
           <div
             class="custom-select__option ${item.value === currentValue ? 'is-selected' : ''}"
             role="option"
@@ -54,7 +56,9 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
             ${item.value === currentValue ? checkIcon() : ''}
             <span>${escHtml(item.label)}</span>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
     `
   }
@@ -77,7 +81,7 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
 
   function open() {
     // Fecha outros selects abertos
-    document.querySelectorAll('.custom-select.is-open').forEach(el => {
+    document.querySelectorAll('.custom-select.is-open').forEach((el) => {
       if (el !== wrap) el.querySelector('.custom-select__trigger')?.click()
     })
 
@@ -111,17 +115,20 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
 
   function onKeydown(e) {
     const dropdown = wrap.querySelector('.custom-select__dropdown')
-    const options  = [...(dropdown?.querySelectorAll('.custom-select__option') || [])]
-    const focused  = document.activeElement
+    const options = [...(dropdown?.querySelectorAll('.custom-select__option') || [])]
+    const focused = document.activeElement
 
-    if (e.key === 'Escape') { close(); wrap.querySelector('.custom-select__trigger')?.focus(); return }
+    if (e.key === 'Escape') {
+      close()
+      wrap.querySelector('.custom-select__trigger')?.focus()
+      return
+    }
 
     if (['ArrowDown', 'ArrowUp'].includes(e.key)) {
       e.preventDefault()
       const idx = options.indexOf(focused)
-      const next = e.key === 'ArrowDown'
-        ? options[Math.min(idx + 1, options.length - 1)]
-        : options[Math.max(idx - 1, 0)]
+      const next =
+        e.key === 'ArrowDown' ? options[Math.min(idx + 1, options.length - 1)] : options[Math.max(idx - 1, 0)]
       next?.focus()
     }
 
@@ -144,10 +151,10 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
       wrap.classList.contains('is-open') ? close() : open()
     })
 
-    options.forEach(opt => {
+    options.forEach((opt) => {
       opt.addEventListener('click', (e) => {
         e.stopPropagation()
-        const val   = opt.dataset.value
+        const val = opt.dataset.value
         const label = opt.querySelector('span')?.textContent || ''
         selectItem(val, label)
         close()
@@ -163,12 +170,16 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
   // Expõe métodos
   wrap.getValue = () => currentValue
   wrap.setValue = (val) => {
-    const item = items.find(i => i.value === val)
-    if (item) { currentValue = item.value; currentLabel = item.label; render() }
+    const item = items.find((i) => i.value === val)
+    if (item) {
+      currentValue = item.value
+      currentLabel = item.label
+      render()
+    }
   }
   wrap.setItems = (newItems) => {
     items = newItems || []
-    const match = items.find(i => i.value === currentValue)
+    const match = items.find((i) => i.value === currentValue)
     if (!match) {
       currentValue = items[0]?.value || ''
       currentLabel = items[0]?.label || label
@@ -182,9 +193,15 @@ export function createCustomSelect({ id, label, value = '', items = [], theme = 
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
-function escAttr(s) { return escHtml(s) }
+function escAttr(s) {
+  return escHtml(s)
+}
 function checkIcon() {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"

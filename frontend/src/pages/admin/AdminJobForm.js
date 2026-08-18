@@ -2,10 +2,17 @@
  * A&L Talent Admin — Formulário de Criação e Edição de Vagas
  */
 
-import { adminCreateJob, adminUpdateJob, getJob, adminGetDepartments, adminCreateDepartment, adminGetUsers } from '../../api.js'
-import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
-import { navigate } from '../../router.js'
+import {
+  adminCreateDepartment,
+  adminCreateJob,
+  adminGetDepartments,
+  adminGetUsers,
+  adminUpdateJob,
+  getJob,
+} from '../../api.js'
+import { bindAdminLayoutEvents, renderAdminLayout } from '../../components/AdminLayout.js'
 import { showToast } from '../../components/Toast.js'
+import { navigate } from '../../router.js'
 
 export async function renderAdminJobForm({ id }, appEl) {
   const isEditing = Boolean(id)
@@ -17,7 +24,7 @@ export async function renderAdminJobForm({ id }, appEl) {
     const [deptRes, usersRes, jobRes] = await Promise.all([
       adminGetDepartments(),
       adminGetUsers().catch(() => ({ users: [] })),
-      isEditing ? getJob(id).catch(() => null) : Promise.resolve(null)
+      isEditing ? getJob(id).catch(() => null) : Promise.resolve(null),
     ])
     departments = deptRes.departments || []
     recruiters = usersRes.users || []
@@ -45,7 +52,7 @@ export async function renderAdminJobForm({ id }, appEl) {
     public: 1,
   }
 
-  const isPublicChecked = (job.status === 'Active-Share' || job.public === 1)
+  const isPublicChecked = job.status === 'Active-Share' || job.public === 1
 
   const content = `
     <div style="max-width: 800px; margin-inline: auto;">
@@ -88,11 +95,15 @@ export async function renderAdminJobForm({ id }, appEl) {
               </div>
               <select id="job-department" name="department_id" class="form-control" required>
                 <option value="">Selecione o departamento</option>
-                ${departments.map(d => `
+                ${departments
+                  .map(
+                    (d) => `
                   <option value="${d.company_department_id}" ${String(d.company_department_id) === String(job.company_department_id) ? 'selected' : ''}>
                     ${escHtml(d.name)}
                   </option>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </select>
             </div>
 
@@ -100,11 +111,15 @@ export async function renderAdminJobForm({ id }, appEl) {
               <label class="form-label" for="job-recruiter">Recrutador(a) Responsável</label>
               <select id="job-recruiter" name="recruiter_id" class="form-control">
                 <option value="">Selecione o(a) recrutador(a)</option>
-                ${recruiters.map(u => `
+                ${recruiters
+                  .map(
+                    (u) => `
                   <option value="${u.user_id}" ${String(u.user_id) === String(job.recruiter_id || job.recruiter) ? 'selected' : ''}>
                     ${escHtml(u.full_name)} (${escHtml(u.role)})
                   </option>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </select>
             </div>
           </div>
@@ -312,9 +327,15 @@ function bindFormEvents(isEditing, id) {
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function escAttr(s) {
-  return String(s ?? '').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+  return String(s ?? '')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
 }

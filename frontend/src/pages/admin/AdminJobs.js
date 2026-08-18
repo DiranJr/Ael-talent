@@ -2,15 +2,30 @@
  * A&L Talent Admin — Listagem e Gestão de Vagas com Recrutadores
  */
 
-import { adminGetJobs, adminToggleJobStatus, adminDeleteJob, getAdminUser } from '../../api.js'
-import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
-import { navigate } from '../../router.js'
+import { adminDeleteJob, adminGetJobs, adminToggleJobStatus, getAdminUser } from '../../api.js'
+import { bindAdminLayoutEvents, renderAdminLayout } from '../../components/AdminLayout.js'
 import { showToast } from '../../components/Toast.js'
+import { navigate } from '../../router.js'
 
 export async function renderAdminJobs(params, appEl) {
-  let jobsData = []
   const currentUser = getAdminUser() || {}
 
+  const topActions = `
+    <a href="#/admin/jobs/new" class="btn btn-primary btn-sm">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+      <span>Nova Vaga</span>
+    </a>
+  `
+
+  // Renderiza Skeleton imediato
+  appEl.innerHTML = renderAdminLayout(renderJobsSkeleton(), {
+    title: 'Gestão de Vagas',
+    activeRoute: '/admin/jobs',
+    topActionsHtml: topActions,
+  })
+  bindAdminLayoutEvents(appEl)
+
+  let jobsData = []
   try {
     const res = await adminGetJobs()
     jobsData = res.jobs || []
@@ -21,14 +36,7 @@ export async function renderAdminJobs(params, appEl) {
     }
   }
 
-  const topActions = `
-    <a href="#/admin/jobs/new" class="btn btn-primary btn-sm">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-      <span>Nova Vaga</span>
-    </a>
-  `
-
-  const myJobsCount = jobsData.filter(j => j.recruiter_id === currentUser.user_id).length
+  const myJobsCount = jobsData.filter((j) => j.recruiter_id === currentUser.user_id).length
 
   const content = `
     <!-- FILTROS E BUSCA -->
@@ -79,6 +87,45 @@ export async function renderAdminJobs(params, appEl) {
   bindJobsEvents(appEl, jobsData, currentUser)
 }
 
+function renderJobsSkeleton() {
+  return `
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 1.5rem;" aria-hidden="true">
+      <div style="display: flex; gap: 0.5rem;">
+        <div class="skeleton" style="width: 90px; height: 32px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 90px; height: 32px; border-radius: 4px;"></div>
+        <div class="skeleton" style="width: 90px; height: 32px; border-radius: 4px;"></div>
+      </div>
+      <div class="skeleton" style="width: 240px; height: 36px; border-radius: 6px;"></div>
+    </div>
+
+    <div class="data-card" aria-hidden="true">
+      <div style="padding: 1rem; display: flex; flex-direction: column; gap: 0.875rem;">
+        ${[1, 2, 3, 4, 5, 6]
+          .map(
+            () => `
+          <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 0.8fr 1fr 1.5fr; gap: 1rem; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--ael-line);">
+            <div style="display:flex;flex-direction:column;gap:0.35rem;">
+              <div class="skeleton" style="width: 75%; height: 16px;"></div>
+              <div class="skeleton" style="width: 45%; height: 12px;"></div>
+            </div>
+            <div class="skeleton" style="width: 70%; height: 14px;"></div>
+            <div class="skeleton" style="width: 65%; height: 14px;"></div>
+            <div class="skeleton" style="width: 60%; height: 14px;"></div>
+            <div class="skeleton" style="width: 40px; height: 16px; margin: 0 auto;"></div>
+            <div class="skeleton skeleton-pill" style="margin: 0 auto;"></div>
+            <div style="display:flex;gap:0.35rem;justify-content:flex-end;">
+              <div class="skeleton" style="width: 80px; height: 28px; border-radius: 4px;"></div>
+              <div class="skeleton" style="width: 60px; height: 28px; border-radius: 4px;"></div>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    </div>
+  `
+}
+
 function renderJobsRows(jobs, currentUser) {
   if (!jobs.length) {
     return `
@@ -90,17 +137,19 @@ function renderJobsRows(jobs, currentUser) {
     `
   }
 
-  const isAdmin = (currentUser?.access_level || 0) >= 400 || currentUser?.role === 'Administrador' || currentUser?.role === 'admin'
+  const isAdmin =
+    (currentUser?.access_level || 0) >= 400 || currentUser?.role === 'Administrador' || currentUser?.role === 'admin'
 
-  return jobs.map(job => {
-    const isClosed = job.status === 'Closed' || job.status === 'Canceled'
-    const isHold = job.status === 'On Hold'
-    const isPublic = !isClosed && !isHold && (job.status === 'Active-Share' || job.public === 1)
-    const statusLabel = isClosed ? 'Encerrada' : (isHold ? 'Pausada' : (isPublic ? 'Publicada' : job.status))
-    const statusPillClass = isPublic ? 'green' : (isHold ? 'amber' : 'gray')
-    const isMyJob = job.recruiter_id === currentUser?.user_id
+  return jobs
+    .map((job) => {
+      const isClosed = job.status === 'Closed' || job.status === 'Canceled'
+      const isHold = job.status === 'On Hold'
+      const isPublic = !isClosed && !isHold && (job.status === 'Active-Share' || job.public === 1)
+      const statusLabel = isClosed ? 'Encerrada' : isHold ? 'Pausada' : isPublic ? 'Publicada' : job.status
+      const statusPillClass = isPublic ? 'green' : isHold ? 'amber' : 'gray'
+      const isMyJob = job.recruiter_id === currentUser?.user_id
 
-    return `
+      return `
       <tr data-id="${job.joborder_id}">
         <td>
           <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem; line-height: 1.35;">${escHtml(job.title)}</div>
@@ -137,41 +186,54 @@ function renderJobsRows(jobs, currentUser) {
             </a>
 
             <!-- Ações de Ciclo de Vida -->
-            ${isClosed ? `
+            ${
+              isClosed
+                ? `
               <button type="button" class="admin-action-btn btn-publish job-action-btn" data-action="reopen" data-id="${job.joborder_id}" title="Reabrir e publicar vaga no mural">
                 🔄 Reabrir
               </button>
-            ` : `
-              ${isPublic ? `
+            `
+                : `
+              ${
+                isPublic
+                  ? `
                 <button type="button" class="admin-action-btn job-action-btn" data-action="pause" data-id="${job.joborder_id}" title="Pausar vaga (ocultar temporariamente do portal)">
                   ⏸ Pausar
                 </button>
-              ` : `
+              `
+                  : `
                 <button type="button" class="admin-action-btn btn-publish job-action-btn" data-action="publish" data-id="${job.joborder_id}" title="Publicar no portal de carreiras">
                   ▶ Publicar
                 </button>
-              `}
+              `
+              }
 
               <button type="button" class="admin-action-btn btn-warning job-action-btn" data-action="close" data-id="${job.joborder_id}" title="Encerrar processo seletivo desta vaga">
                 🔒 Encerrar
               </button>
-            `}
+            `
+            }
 
             <!-- Ações Rápidas: Editar e Excluir -->
             <a href="#/admin/jobs/${job.joborder_id}/edit" class="btn-icon" title="Editar informações da vaga">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
             </a>
 
-            ${isAdmin ? `
+            ${
+              isAdmin
+                ? `
               <button type="button" class="btn-icon btn-danger-icon job-delete-btn" data-id="${job.joborder_id}" data-title="${escHtml(job.title)}" title="Excluir vaga permanentemente">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
               </button>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
         </td>
       </tr>
     `
-  }).join('')
+    })
+    .join('')
 }
 
 function bindJobsEvents(appEl, jobsData, currentUser) {
@@ -183,22 +245,24 @@ function bindJobsEvents(appEl, jobsData, currentUser) {
     let filtered = jobsData
 
     if (currentStatus) {
-      if (currentStatus === 'active') filtered = filtered.filter(j => j.status === 'Active-Share' || j.public === 1)
-      else if (currentStatus === 'hold') filtered = filtered.filter(j => j.status === 'On Hold')
-      else if (currentStatus === 'closed') filtered = filtered.filter(j => j.status === 'Closed' || j.status === 'Canceled')
+      if (currentStatus === 'active') filtered = filtered.filter((j) => j.status === 'Active-Share' || j.public === 1)
+      else if (currentStatus === 'hold') filtered = filtered.filter((j) => j.status === 'On Hold')
+      else if (currentStatus === 'closed')
+        filtered = filtered.filter((j) => j.status === 'Closed' || j.status === 'Canceled')
     }
 
     if (currentRecruiter) {
-      filtered = filtered.filter(j => String(j.recruiter_id) === String(currentRecruiter))
+      filtered = filtered.filter((j) => String(j.recruiter_id) === String(currentRecruiter))
     }
 
     if (currentSearch) {
       const q = currentSearch.toLowerCase()
-      filtered = filtered.filter(j =>
-        (j.title || '').toLowerCase().includes(q) ||
-        (j.city || '').toLowerCase().includes(q) ||
-        (j.department_name || '').toLowerCase().includes(q) ||
-        (j.recruiter_name || '').toLowerCase().includes(q)
+      filtered = filtered.filter(
+        (j) =>
+          (j.title || '').toLowerCase().includes(q) ||
+          (j.city || '').toLowerCase().includes(q) ||
+          (j.department_name || '').toLowerCase().includes(q) ||
+          (j.recruiter_name || '').toLowerCase().includes(q)
       )
     }
 
@@ -208,9 +272,9 @@ function bindJobsEvents(appEl, jobsData, currentUser) {
   }
 
   // Filtros de Status
-  appEl.querySelectorAll('.job-filter-btn').forEach(btn => {
+  appEl.querySelectorAll('.job-filter-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
-      appEl.querySelectorAll('.job-filter-btn').forEach(b => {
+      appEl.querySelectorAll('.job-filter-btn').forEach((b) => {
         b.classList.remove('btn-dark', 'active')
         b.classList.add('btn-outline')
       })
@@ -226,8 +290,8 @@ function bindJobsEvents(appEl, jobsData, currentUser) {
   appEl.querySelector('.job-recruiter-filter-btn')?.addEventListener('click', (e) => {
     const btn = e.currentTarget
     const isAlreadyActive = btn.classList.contains('btn-dark')
-    
-    appEl.querySelectorAll('.job-filter-btn, .job-recruiter-filter-btn').forEach(b => {
+
+    appEl.querySelectorAll('.job-filter-btn, .job-recruiter-filter-btn').forEach((b) => {
       b.classList.remove('btn-dark', 'active')
       b.classList.add('btn-outline')
     })
@@ -255,11 +319,13 @@ function bindJobsEvents(appEl, jobsData, currentUser) {
 
 function bindRowActions(appEl) {
   // Ações de Toggle Status (Publicar / Pausar / Encerrar / Reabrir)
-  appEl.querySelectorAll('.job-action-btn').forEach(btn => {
+  appEl.querySelectorAll('.job-action-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
+      if (btn.disabled) return
       const id = btn.dataset.id
       const action = btn.dataset.action
       btn.disabled = true
+      btn.style.opacity = '0.6'
 
       let msg = 'Status da vaga atualizado.'
       if (action === 'publish' || action === 'reopen') msg = 'Vaga publicada e visível no portal.'
@@ -271,23 +337,28 @@ function bindRowActions(appEl) {
         showToast({
           title: 'Status atualizado!',
           message: msg,
-          type: 'success'
+          type: 'success',
         })
         renderAdminJobs({}, appEl)
       } catch (err) {
         showToast({ title: 'Erro', message: err.message, type: 'error' })
         btn.disabled = false
+        btn.style.opacity = '1'
       }
     })
   })
 
   // Ação de Exclusão
-  appEl.querySelectorAll('.job-delete-btn').forEach(btn => {
+  appEl.querySelectorAll('.job-delete-btn').forEach((btn) => {
     btn.addEventListener('click', async () => {
+      if (btn.disabled) return
       const id = btn.dataset.id
       const title = btn.dataset.title
-      if (confirm(`Tem certeza que deseja excluir a vaga "${title}"? Todas as candidaturas vinculadas serão removidas.`)) {
+      if (
+        confirm(`Tem certeza que deseja excluir a vaga "${title}"? Todas as candidaturas vinculadas serão removidas.`)
+      ) {
         btn.disabled = true
+        btn.style.opacity = '0.6'
         try {
           await adminDeleteJob(id)
           showToast({ title: 'Vaga excluída', message: 'A vaga foi removida do sistema.', type: 'success' })
@@ -295,6 +366,7 @@ function bindRowActions(appEl) {
         } catch (err) {
           showToast({ title: 'Erro ao excluir', message: err.message, type: 'error' })
           btn.disabled = false
+          btn.style.opacity = '1'
         }
       }
     })
@@ -302,7 +374,11 @@ function bindRowActions(appEl) {
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function formatDate(d) {

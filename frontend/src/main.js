@@ -1,5 +1,5 @@
 /**
- * A&L Talent — Entry Point
+ * A&L Talent — Entry Point com Route-Level Code Splitting
  */
 
 import './styles/tokens.css'
@@ -7,34 +7,17 @@ import './styles/base.css'
 import './styles/components.css'
 import './styles/admin.css'
 
-import { renderHeader } from './components/Header.js'
 import { renderFooter } from './components/Footer.js'
+import { renderHeader } from './components/Header.js'
 import { initRouter, route } from './router.js'
 
-// Páginas Públicas
-import { renderHome }               from './pages/Home.js'
-import { renderJobDetail }          from './pages/JobDetail.js'
-import { renderTalentPool }         from './pages/TalentPool.js'
-import { renderTalentPoolRegister } from './pages/TalentPoolRegister.js'
-import { renderCandidatePortal }    from './pages/CandidatePortal.js'
-
-// Páginas Administrativas (RH)
-import { renderAdminLogin }       from './pages/admin/AdminLogin.js'
-import { renderAdminDashboard }   from './pages/admin/AdminDashboard.js'
-import { renderAdminJobs }        from './pages/admin/AdminJobs.js'
-import { renderAdminJobForm }     from './pages/admin/AdminJobForm.js'
-import { renderAdminCandidates }  from './pages/admin/AdminCandidates.js'
-import { renderAdminTalentPool }  from './pages/admin/AdminTalentPool.js'
-import { renderAdminDepartments } from './pages/admin/AdminDepartments.js'
-import { renderAdminUsers }       from './pages/admin/AdminUsers.js'
-
-const appEl    = document.getElementById('app')
-const mainEl   = document.createElement('main')
-mainEl.id      = 'main-content'
+const appEl = document.getElementById('app')
+const mainEl = document.createElement('main')
+mainEl.id = 'main-content'
 mainEl.setAttribute('role', 'main')
 
 // ─── Layout Shell Público ───────────────────────────────────────
-const { el: headerEl, cleanup: headerCleanup } = renderHeader()
+const { el: headerEl } = renderHeader()
 const footerEl = renderFooter()
 
 appEl.appendChild(headerEl)
@@ -51,27 +34,27 @@ function updateLayoutVisibility() {
 window.addEventListener('hashchange', updateLayoutVisibility)
 updateLayoutVisibility()
 
-// ─── Rotas Públicas ─────────────────────────────────────────────
-route('/',                     renderHome)
-route('/jobs',                 renderHome)
-route('/jobs/:id',             renderJobDetail)
-route('/jobs/:id/apply',       renderTalentPoolRegister) // Candidatura obrigatória via Perfil Estruturado do Banco de Talentos!
-route('/talent-pool',          renderTalentPool)
-route('/talent-pool/register', renderTalentPoolRegister)
-route('/banco-talentos',       renderTalentPool)
-route('/candidato',            renderCandidatePortal)
-route('/meu-perfil',           renderCandidatePortal)
+// ─── Rotas Públicas (Dynamic Imports / Code Splitting) ────────────
+route('/', () => import('./pages/Home.js').then((m) => m.renderHome))
+route('/jobs', () => import('./pages/Home.js').then((m) => m.renderHome))
+route('/jobs/:id', () => import('./pages/JobDetail.js').then((m) => m.renderJobDetail))
+route('/jobs/:id/apply', () => import('./pages/TalentPoolRegister.js').then((m) => m.renderTalentPoolRegister))
+route('/talent-pool', () => import('./pages/TalentPool.js').then((m) => m.renderTalentPool))
+route('/talent-pool/register', () => import('./pages/TalentPoolRegister.js').then((m) => m.renderTalentPoolRegister))
+route('/banco-talentos', () => import('./pages/TalentPool.js').then((m) => m.renderTalentPool))
+route('/candidato', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
+route('/meu-perfil', () => import('./pages/CandidatePortal.js').then((m) => m.renderCandidatePortal))
 
-// ─── Rotas Administrativas (RH) ─────────────────────────────────
-route('/admin/login',         renderAdminLogin)
-route('/admin',               renderAdminDashboard)
-route('/admin/jobs',          renderAdminJobs)
-route('/admin/jobs/new',      renderAdminJobForm)
-route('/admin/jobs/:id/edit', renderAdminJobForm)
-route('/admin/candidates',    renderAdminCandidates)
-route('/admin/talent-pool',   renderAdminTalentPool)
-route('/admin/departments',   renderAdminDepartments)
-route('/admin/users',         renderAdminUsers)
+// ─── Rotas Administrativas RH (Carregadas exclusivamente sob demanda) ─
+route('/admin/login', () => import('./pages/admin/AdminLogin.js').then((m) => m.renderAdminLogin))
+route('/admin', () => import('./pages/admin/AdminDashboard.js').then((m) => m.renderAdminDashboard))
+route('/admin/jobs', () => import('./pages/admin/AdminJobs.js').then((m) => m.renderAdminJobs))
+route('/admin/jobs/new', () => import('./pages/admin/AdminJobForm.js').then((m) => m.renderAdminJobForm))
+route('/admin/jobs/:id/edit', () => import('./pages/admin/AdminJobForm.js').then((m) => m.renderAdminJobForm))
+route('/admin/candidates', () => import('./pages/admin/AdminCandidates.js').then((m) => m.renderAdminCandidates))
+route('/admin/talent-pool', () => import('./pages/admin/AdminTalentPool.js').then((m) => m.renderAdminTalentPool))
+route('/admin/departments', () => import('./pages/admin/AdminDepartments.js').then((m) => m.renderAdminDepartments))
+route('/admin/users', () => import('./pages/admin/AdminUsers.js').then((m) => m.renderAdminUsers))
 
 // ─── Inicia o router ───────────────────────────────────────────
 initRouter(mainEl)

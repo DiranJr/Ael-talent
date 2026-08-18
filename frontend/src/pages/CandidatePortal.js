@@ -4,14 +4,14 @@
  */
 
 import {
+  candidateGetMe,
   candidateLogin,
   candidateSetPassword,
-  candidateGetMe,
-  registerTalentPool,
-  getCandidateToken,
-  setCandidateAuth,
   clearCandidateAuth,
+  getCandidateToken,
   getFilters,
+  registerTalentPool,
+  setCandidateAuth,
 } from '../api.js'
 import { showToast } from '../components/Toast.js'
 import { navigate } from '../router.js'
@@ -21,9 +21,13 @@ export async function renderCandidatePortal(params, appEl) {
   let candidateData = null
   let departments = []
 
+  if (token) {
+    appEl.innerHTML = renderCandidatePortalSkeleton()
+  }
+
   try {
     const filtersRes = await getFilters()
-    departments = (filtersRes.departments || []).filter(d => d.value)
+    departments = (filtersRes.departments || []).filter((d) => d.value)
 
     if (token) {
       const res = await candidateGetMe()
@@ -69,7 +73,9 @@ function renderLoginScreen(appEl, departments) {
               </p>
             </div>
 
-            ${!isFirstAccessMode ? `
+            ${
+              !isFirstAccessMode
+                ? `
               <!-- FORMULÁRIO DE LOGIN NORMAL -->
               <form id="candidate-login-form">
                 <div class="form-group">
@@ -104,7 +110,8 @@ function renderLoginScreen(appEl, departments) {
                   <span>Entrar no Meu Painel</span>
                 </button>
               </form>
-            ` : `
+            `
+                : `
               <!-- FORMULÁRIO DE PRIMEIRO ACESSO / DEFINIR SENHA -->
               <form id="candidate-setpwd-form">
                 <div class="form-group">
@@ -127,7 +134,8 @@ function renderLoginScreen(appEl, departments) {
                   <button type="submit" class="btn btn-primary btn-full" id="setpwd-submit-btn">Salvar Senha & Acessar</button>
                 </div>
               </form>
-            `}
+            `
+            }
 
             <div style="text-align: center; margin-top: 1.75rem; font-size: 0.8125rem; color: var(--ael-muted); border-top: 1px solid var(--ael-line); padding-top: 1.25rem;">
               Ainda não possui cadastro no Banco de Talentos?
@@ -189,7 +197,7 @@ function renderLoginScreen(appEl, departments) {
     document.getElementById('candidate-setpwd-form')?.addEventListener('submit', async (e) => {
       e.preventDefault()
       const email = document.getElementById('setpwd-email').value.trim()
-      const pass  = document.getElementById('setpwd-pass').value
+      const pass = document.getElementById('setpwd-pass').value
       const pass2 = document.getElementById('setpwd-pass-confirm').value
 
       if (pass !== pass2) {
@@ -274,16 +282,22 @@ function renderPortalDashboard(appEl, cand, departments) {
           </div>
 
           <!-- CONTEÚDO DA ABA: MINHAS CANDIDATURAS -->
-          ${activeTab === 'candidaturas' ? `
+          ${
+            activeTab === 'candidaturas'
+              ? `
             <div class="data-card">
               <div class="data-card-header">
                 <div class="data-card-title">Processos Seletivos em Andamento</div>
                 <span style="font-size: 0.8125rem; color: var(--ael-muted);">Acompanhe o status em tempo real</span>
               </div>
 
-              ${apps.length ? `
+              ${
+                apps.length
+                  ? `
                 <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
-                  ${apps.map(a => `
+                  ${apps
+                    .map(
+                      (a) => `
                     <div style="
                       background: #ffffff;
                       border: 1.5px solid var(--ael-line);
@@ -310,20 +324,28 @@ function renderPortalDashboard(appEl, cand, departments) {
                         </span>
                       </div>
                     </div>
-                  `).join('')}
+                  `
+                    )
+                    .join('')}
                 </div>
-              ` : `
+              `
+                  : `
                 <div style="text-align: center; padding: 3.5rem 1.5rem; color: var(--ael-muted);">
                   <p style="margin-bottom: 1.25rem;">Você ainda não se candidatou a nenhuma vaga específica.</p>
                   <p style="font-size: 0.875rem; color: var(--ael-text);">Seu perfil está <strong>ativo no Banco de Talentos oficial</strong> e disponível para busca pelo RH!</p>
                   <a href="#/jobs" class="btn btn-primary" style="margin-top: 1rem;">Explorar Vagas Abertas</a>
                 </div>
-              `}
+              `
+              }
             </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <!-- CONTEÚDO DA ABA: MEU PERFIL -->
-          ${activeTab === 'perfil' ? `
+          ${
+            activeTab === 'perfil'
+              ? `
             <div class="data-card" style="padding: 2rem;">
               <form id="cand-edit-profile-form">
                 <div class="data-card-title" style="margin-bottom: 1.5rem;">Atualizar Informações do Perfil</div>
@@ -355,7 +377,7 @@ function renderPortalDashboard(appEl, cand, departments) {
                   <div class="form-group">
                     <label class="form-label">Área de Interesse *</label>
                     <select id="prof-area" class="form-control" required>
-                      ${departments.map(d => `<option value="${escAttr(d.name)}" ${cand.interest_area === d.name ? 'selected' : ''}>${escHtml(d.name)}</option>`).join('')}
+                      ${departments.map((d) => `<option value="${escAttr(d.name)}" ${cand.interest_area === d.name ? 'selected' : ''}>${escHtml(d.name)}</option>`).join('')}
                     </select>
                   </div>
                   <div class="form-group">
@@ -377,7 +399,9 @@ function renderPortalDashboard(appEl, cand, departments) {
                   </div>
 
                   <div id="prof-edus-list" style="display: flex; flex-direction: column; gap: 1rem;">
-                    ${edus.map((e, idx) => `
+                    ${edus
+                      .map(
+                        (e, idx) => `
                       <div class="prof-edu-item" data-idx="${idx}" style="background: var(--ael-surface); padding: 1rem; border-radius: var(--ael-radius-md); border: 1px solid var(--ael-line);">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
                           <span style="font-weight: 700; font-size: 0.8125rem; color: var(--ael-green-base);">Formação #${idx + 1}</span>
@@ -392,7 +416,9 @@ function renderPortalDashboard(appEl, cand, departments) {
                           <input type="text" class="form-control p-edu-year" placeholder="Ano" value="${escAttr(e.year)}" />
                         </div>
                       </div>
-                    `).join('')}
+                    `
+                      )
+                      .join('')}
                   </div>
                 </div>
 
@@ -404,7 +430,9 @@ function renderPortalDashboard(appEl, cand, departments) {
                   </div>
 
                   <div id="prof-exps-list" style="display: flex; flex-direction: column; gap: 1rem;">
-                    ${exps.map((exp, idx) => `
+                    ${exps
+                      .map(
+                        (exp, idx) => `
                       <div class="prof-exp-item" data-idx="${idx}" style="background: var(--ael-surface); padding: 1rem; border-radius: var(--ael-radius-md); border: 1px solid var(--ael-line);">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 0.75rem;">
                           <span style="font-weight: 700; font-size: 0.8125rem; color: var(--ael-green-base);">Experiência #${idx + 1}</span>
@@ -418,7 +446,9 @@ function renderPortalDashboard(appEl, cand, departments) {
                           <input type="text" class="form-control p-exp-per" placeholder="Período (ex: 2021 a 2023)" value="${escAttr(exp.period)}" />
                         </div>
                       </div>
-                    `).join('')}
+                    `
+                      )
+                      .join('')}
                   </div>
                 </div>
 
@@ -429,7 +459,9 @@ function renderPortalDashboard(appEl, cand, departments) {
                 </div>
               </form>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
 
         </div>
       </div>
@@ -463,7 +495,7 @@ function renderPortalDashboard(appEl, cand, departments) {
       renderView()
     })
 
-    document.querySelectorAll('.prof-del-edu').forEach(btn => {
+    document.querySelectorAll('.prof-del-edu').forEach((btn) => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.idx)
         cand.educations.splice(idx, 1)
@@ -478,7 +510,7 @@ function renderPortalDashboard(appEl, cand, departments) {
       renderView()
     })
 
-    document.querySelectorAll('.prof-del-exp').forEach(btn => {
+    document.querySelectorAll('.prof-del-exp').forEach((btn) => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.idx)
         cand.experiences.splice(idx, 1)
@@ -495,7 +527,7 @@ function renderPortalDashboard(appEl, cand, departments) {
 
       // Coleta formações
       const eduItems = document.querySelectorAll('.prof-edu-item')
-      const educations = Array.from(eduItems).map(item => ({
+      const educations = Array.from(eduItems).map((item) => ({
         level: item.querySelector('.p-edu-level')?.value || '',
         course: item.querySelector('.p-edu-course')?.value || '',
         institution: item.querySelector('.p-edu-inst')?.value || '',
@@ -504,7 +536,7 @@ function renderPortalDashboard(appEl, cand, departments) {
 
       // Coleta experiências
       const expItems = document.querySelectorAll('.prof-exp-item')
-      const experiences = Array.from(expItems).map(item => ({
+      const experiences = Array.from(expItems).map((item) => ({
         role: item.querySelector('.p-exp-role')?.value || '',
         company: item.querySelector('.p-exp-comp')?.value || '',
         period: item.querySelector('.p-exp-per')?.value || '',
@@ -527,7 +559,11 @@ function renderPortalDashboard(appEl, cand, departments) {
 
       try {
         await registerTalentPool(payload)
-        showToast({ title: 'Perfil Atualizado', message: 'Suas informações foram salvas com sucesso!', type: 'success' })
+        showToast({
+          title: 'Perfil Atualizado',
+          message: 'Suas informações foram salvas com sucesso!',
+          type: 'success',
+        })
         const ref = await candidateGetMe()
         if (ref?.success && ref.candidate) cand = ref.candidate
         activeTab = 'candidaturas'
@@ -545,34 +581,103 @@ function renderPortalDashboard(appEl, cand, departments) {
 
 function getStatusLabel(status) {
   switch (parseInt(status)) {
-    case 100: return '📥 Recebido / Em Análise'
-    case 200: return '📞 Contactado pelo RH'
-    case 300: return '🔍 Em Triagem Técnica'
-    case 400: return '📤 Enviado ao Gestor'
-    case 500: return '🗣️ Entrevista Agendada'
-    case 600: return '🏆 Aprovado / Proposta'
-    case 650: return '📂 Banco de Talentos (Futuro)'
-    case 700: return '❌ Não Selecionado'
-    default: return 'Em Análise'
+    case 100:
+      return '📥 Recebido / Em Análise'
+    case 200:
+      return '📞 Contactado pelo RH'
+    case 300:
+      return '🔍 Em Triagem Técnica'
+    case 400:
+      return '📤 Enviado ao Gestor'
+    case 500:
+      return '🗣️ Entrevista Agendada'
+    case 600:
+      return '🏆 Aprovado / Proposta'
+    case 650:
+      return '📂 Banco de Talentos (Futuro)'
+    case 700:
+      return '❌ Não Selecionado'
+    default:
+      return 'Em Análise'
   }
 }
 
 function getStatusColor(status) {
   switch (parseInt(status)) {
     case 500:
-    case 600: return 'green'
+    case 600:
+      return 'green'
     case 300:
-    case 400: return 'amber'
-    case 700: return 'gray'
-    default: return 'green'
+    case 400:
+      return 'amber'
+    case 700:
+      return 'gray'
+    default:
+      return 'green'
   }
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
-function escAttr(s) { return escHtml(s) }
+function escAttr(s) {
+  return escHtml(s)
+}
 function formatDate(str) {
-  try { return new Date(str).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) }
-  catch { return '' }
+  try {
+    return new Date(str).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  } catch {
+    return ''
+  }
+}
+
+function renderCandidatePortalSkeleton() {
+  return `
+    <div style="background: var(--ael-surface); min-height: 100vh; padding-top: calc(var(--ael-header-h) + 2rem); padding-bottom: 5rem;" aria-hidden="true">
+      <div class="container">
+        <!-- Header Banner Skeleton -->
+        <div class="data-card" style="padding: 2rem; margin-bottom: 2rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 1.25rem;">
+              <div class="skeleton" style="width: 64px; height: 64px; border-radius: var(--ael-radius-md);"></div>
+              <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <div class="skeleton" style="width: 200px; height: 24px;"></div>
+                <div class="skeleton" style="width: 150px; height: 16px;"></div>
+              </div>
+            </div>
+            <div class="skeleton" style="width: 100px; height: 36px; border-radius: 6px;"></div>
+          </div>
+        </div>
+
+        <!-- Content Card Skeleton -->
+        <div class="data-card" style="padding: 2rem;">
+          <div style="display: flex; gap: 1rem; border-bottom: 1.5px solid var(--ael-line); padding-bottom: 1rem; margin-bottom: 2rem;">
+            <div class="skeleton" style="width: 140px; height: 32px; border-radius: 4px;"></div>
+            <div class="skeleton" style="width: 140px; height: 32px; border-radius: 4px;"></div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+            ${[1, 2]
+              .map(
+                () => `
+              <div style="padding: 1.5rem; border: 1.5px solid var(--ael-line); border-radius: var(--ael-radius-lg); display: flex; flex-direction: column; gap: 0.75rem;">
+                <div style="display: flex; justify-content: space-between;">
+                  <div class="skeleton" style="width: 45%; height: 20px;"></div>
+                  <div class="skeleton skeleton-pill"></div>
+                </div>
+                <div class="skeleton" style="width: 30%; height: 14px;"></div>
+                <div class="skeleton" style="width: 25%; height: 14px;"></div>
+              </div>
+            `
+              )
+              .join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+  `
 }

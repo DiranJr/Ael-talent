@@ -3,8 +3,8 @@
  */
 
 import { adminLogin, getAdminToken } from '../../api.js'
-import { navigate } from '../../router.js'
 import { showToast } from '../../components/Toast.js'
+import { navigate } from '../../router.js'
 
 export async function renderAdminLogin(params, appEl) {
   // Se já logado, redireciona
@@ -100,7 +100,7 @@ export async function renderAdminLogin(params, appEl) {
   `
 
   const form = document.getElementById('admin-login-form')
-  const btn  = document.getElementById('login-submit-btn')
+  const btn = document.getElementById('login-submit-btn')
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault()

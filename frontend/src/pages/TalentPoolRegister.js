@@ -8,7 +8,7 @@
  * Rota: #/talent-pool/register e #/jobs/:id/apply
  */
 
-import { registerTalentPool, getFilters, lookupCandidate, getJob, setCandidateAuth } from '../api.js'
+import { getFilters, getJob, lookupCandidate, registerTalentPool, setCandidateAuth } from '../api.js'
 import { showToast } from '../components/Toast.js'
 
 const SUGGESTED_SKILLS = [
@@ -46,7 +46,7 @@ export async function renderTalentPoolRegister(params, appEl) {
       getFilters(),
       jobId ? getJob(jobId).catch(() => null) : Promise.resolve(null),
     ])
-    departments = (filtersRes.departments || []).filter(d => d.value)
+    departments = (filtersRes.departments || []).filter((d) => d.value)
     if (jobRes?.job) {
       targetJob = jobRes.job
     }
@@ -69,12 +69,8 @@ export async function renderTalentPoolRegister(params, appEl) {
     travel_availability: 'Total (Qualquer região)',
     driver_license: 'Não possui',
     can_relocate: '1',
-    educations: [
-      { level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' }
-    ],
-    experiences: [
-      { role: '', company: '', period: '', is_current: false, activities: '' }
-    ],
+    educations: [{ level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' }],
+    experiences: [{ role: '', company: '', period: '', is_current: false, activities: '' }],
     notes: '',
     key_skills: [],
     consent_lgpd: false,
@@ -83,7 +79,7 @@ export async function renderTalentPoolRegister(params, appEl) {
 
   let currentStep = 1
   const totalSteps = 6
-  let lookupDone = false
+  const lookupDone = false
 
   function render() {
     appEl.innerHTML = `
@@ -91,7 +87,9 @@ export async function renderTalentPoolRegister(params, appEl) {
         <div class="container" style="max-width: 780px; margin-inline: auto;">
 
           <!-- BANNER DE CANDIDATURA DIRETA A VAGA (SE APLICÁVEL) -->
-          ${targetJob ? `
+          ${
+            targetJob
+              ? `
             <div style="
               background: linear-gradient(135deg, var(--ael-green-dark), var(--ael-green-base));
               border-radius: var(--ael-radius-lg);
@@ -120,7 +118,9 @@ export async function renderTalentPoolRegister(params, appEl) {
                 Perfil integrado ao Banco de Talentos
               </div>
             </div>
-          ` : ''}
+          `
+              : ''
+          }
 
           <!-- Breadcrumb & Header -->
           <div style="text-align: center; margin-bottom: 2rem;">
@@ -172,23 +172,31 @@ export async function renderTalentPoolRegister(params, appEl) {
                 padding-top: 1.5rem;
                 border-top: 1px solid var(--ael-line);
               ">
-                ${currentStep > 1 ? `
+                ${
+                  currentStep > 1
+                    ? `
                   <button type="button" class="btn btn-outline" id="prev-step-btn">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m15 18-6-6 6-6"/></svg>
                     <span>Voltar</span>
                   </button>
-                ` : `<div></div>`}
+                `
+                    : `<div></div>`
+                }
 
-                ${currentStep < totalSteps ? `
+                ${
+                  currentStep < totalSteps
+                    ? `
                   <button type="button" class="btn btn-primary btn-lg" id="next-step-btn">
                     <span>Avançar Etapa</span>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m9 18 6-6-6-6"/></svg>
                   </button>
-                ` : `
+                `
+                    : `
                   <button type="submit" class="btn btn-primary btn-lg" id="submit-talent-btn" style="box-shadow: 0 4px 16px rgba(0, 230, 118, 0.3);">
                     <span>${targetJob ? 'Confirmar Candidatura & Salvar Perfil' : 'Concluir Cadastro no Banco de Talentos'}</span>
                   </button>
-                `}
+                `
+                }
               </div>
             </form>
           </div>
@@ -201,13 +209,20 @@ export async function renderTalentPoolRegister(params, appEl) {
 
   function getStepTitle(step) {
     switch (step) {
-      case 1: return 'Dados Pessoais & Contato'
-      case 2: return 'Interesse Profissional'
-      case 3: return 'Formação Acadêmica'
-      case 4: return 'Experiência Profissional & Resumo'
-      case 5: return 'Competências & Habilidades'
-      case 6: return 'Revisão & Finalização'
-      default: return ''
+      case 1:
+        return 'Dados Pessoais & Contato'
+      case 2:
+        return 'Interesse Profissional'
+      case 3:
+        return 'Formação Acadêmica'
+      case 4:
+        return 'Experiência Profissional & Resumo'
+      case 5:
+        return 'Competências & Habilidades'
+      case 6:
+        return 'Revisão & Finalização'
+      default:
+        return ''
     }
   }
 
@@ -314,9 +329,13 @@ export async function renderTalentPoolRegister(params, appEl) {
               <label class="form-label" for="tp-interest-area">Área de Interesse Principal *</label>
               <select id="tp-interest-area" name="interest_area" class="form-control" required>
                 <option value="">Selecione sua área</option>
-                ${depts.map(d => `
+                ${depts
+                  .map(
+                    (d) => `
                   <option value="${d.value}" ${data.interest_area === d.value ? 'selected' : ''}>${escHtml(d.label)}</option>
-                `).join('')}
+                `
+                  )
+                  .join('')}
                 <option value="Operacional" ${data.interest_area === 'Operacional' ? 'selected' : ''}>Operacional / Obras</option>
                 <option value="Engenharia" ${data.interest_area === 'Engenharia' ? 'selected' : ''}>Engenharia & Projetos</option>
                 <option value="Administrativo" ${data.interest_area === 'Administrativo' ? 'selected' : ''}>Administrativo & Financeiro</option>
@@ -384,7 +403,9 @@ export async function renderTalentPoolRegister(params, appEl) {
           </div>
 
           <div id="educations-container" style="display: flex; flex-direction: column; gap: 1.25rem;">
-            ${data.educations.map((edu, idx) => `
+            ${data.educations
+              .map(
+                (edu, idx) => `
               <div class="edu-card" data-idx="${idx}" style="
                 background: #ffffff;
                 border: 1.5px solid var(--ael-line);
@@ -396,11 +417,15 @@ export async function renderTalentPoolRegister(params, appEl) {
                   <span style="font-size: 0.8125rem; font-weight: 700; color: var(--ael-green-base);">
                     Formação #${idx + 1}
                   </span>
-                  ${data.educations.length > 1 ? `
+                  ${
+                    data.educations.length > 1
+                      ? `
                     <button type="button" class="btn-icon danger remove-edu-btn" data-idx="${idx}" title="Remover formação" style="width: 28px; height: 28px;">
                       ✕
                     </button>
-                  ` : ''}
+                  `
+                      : ''
+                  }
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -434,7 +459,9 @@ export async function renderTalentPoolRegister(params, appEl) {
                   </div>
                 </div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         `
 
@@ -460,7 +487,9 @@ export async function renderTalentPoolRegister(params, appEl) {
 
           <!-- LISTA DE EXPERIÊNCIAS -->
           <div id="experiences-container" style="display: flex; flex-direction: column; gap: 1.25rem;">
-            ${data.experiences.map((exp, idx) => `
+            ${data.experiences
+              .map(
+                (exp, idx) => `
               <div class="exp-card" data-idx="${idx}" style="
                 background: #ffffff;
                 border: 1.5px solid var(--ael-line);
@@ -472,11 +501,15 @@ export async function renderTalentPoolRegister(params, appEl) {
                   <span style="font-size: 0.8125rem; font-weight: 700; color: var(--ael-green-base);">
                     Experiência #${idx + 1} ${idx === 0 ? '(Mais Recente)' : ''}
                   </span>
-                  ${data.experiences.length > 1 ? `
+                  ${
+                    data.experiences.length > 1
+                      ? `
                     <button type="button" class="btn-icon danger remove-exp-btn" data-idx="${idx}" title="Remover experiência" style="width: 28px; height: 28px;">
                       ✕
                     </button>
-                  ` : ''}
+                  `
+                      : ''
+                  }
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -500,7 +533,9 @@ export async function renderTalentPoolRegister(params, appEl) {
                   <textarea rows="2" class="form-control exp-activities" placeholder="Descreva brevemente as rotinas, equipamentos ou equipes sob sua responsabilidade..." style="resize: vertical; font-family: inherit;">${escHtml(exp.activities)}</textarea>
                 </div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
         `
 
@@ -514,7 +549,7 @@ export async function renderTalentPoolRegister(params, appEl) {
           </p>
 
           <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem;" id="skills-cloud">
-            ${SUGGESTED_SKILLS.map(skill => {
+            ${SUGGESTED_SKILLS.map((skill) => {
               const isSelected = data.key_skills.includes(skill)
               return `
                 <button
@@ -550,7 +585,7 @@ export async function renderTalentPoolRegister(params, appEl) {
               type="text"
               class="form-control"
               placeholder="Ex: Primavera P6, Cursos específicos, Máquinas pesadas..."
-              value="${escAttr(data.key_skills.filter(s => !SUGGESTED_SKILLS.includes(s)).join(', '))}"
+              value="${escAttr(data.key_skills.filter((s) => !SUGGESTED_SKILLS.includes(s)).join(', '))}"
             />
           </div>
         `
@@ -587,22 +622,26 @@ export async function renderTalentPoolRegister(params, appEl) {
             <div style="font-size: 0.8125rem; border-top: 1px solid rgba(0,91,58,0.1); padding-top: 0.75rem; margin-bottom: 0.75rem;">
               <strong>Formações (${data.educations.length}):</strong>
               <ul style="margin: 0.25rem 0 0 1rem; padding: 0;">
-                ${data.educations.map(e => `<li>${escHtml(e.level)} em ${escHtml(e.course || 'Área não informada')} (${escHtml(e.institution || 'Instituição não informada')})</li>`).join('')}
+                ${data.educations.map((e) => `<li>${escHtml(e.level)} em ${escHtml(e.course || 'Área não informada')} (${escHtml(e.institution || 'Instituição não informada')})</li>`).join('')}
               </ul>
             </div>
 
             <div style="font-size: 0.8125rem; border-top: 1px solid rgba(0,91,58,0.1); padding-top: 0.75rem; margin-bottom: 0.75rem;">
               <strong>Experiências (${data.experiences.length}):</strong>
               <ul style="margin: 0.25rem 0 0 1rem; padding: 0;">
-                ${data.experiences.map(e => `<li>${escHtml(e.role || 'Cargo')} na empresa ${escHtml(e.company || 'Não informada')} ${e.period ? `(${escHtml(e.period)})` : ''}</li>`).join('')}
+                ${data.experiences.map((e) => `<li>${escHtml(e.role || 'Cargo')} na empresa ${escHtml(e.company || 'Não informada')} ${e.period ? `(${escHtml(e.period)})` : ''}</li>`).join('')}
               </ul>
             </div>
 
-            ${data.key_skills.length ? `
+            ${
+              data.key_skills.length
+                ? `
               <div style="margin-top: 0.75rem; font-size: 0.75rem; border-top: 1px solid rgba(0,91,58,0.1); padding-top: 0.75rem;">
                 <strong>Competências:</strong> ${escHtml(data.key_skills.join(', '))}
               </div>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
 
           <!-- UPLOAD OPCIONAL DE CURRÍCULO -->
@@ -637,7 +676,8 @@ export async function renderTalentPoolRegister(params, appEl) {
             </label>
           </div>
         `
-      default: return ''
+      default:
+        return ''
     }
   }
 
@@ -645,43 +685,46 @@ export async function renderTalentPoolRegister(params, appEl) {
     switch (currentStep) {
       case 1:
         formData.first_name = document.getElementById('tp-first-name')?.value || ''
-        formData.last_name  = document.getElementById('tp-last-name')?.value || ''
-        formData.email      = document.getElementById('tp-email')?.value || ''
-        formData.phone            = document.getElementById('tp-phone')?.value || ''
-        formData.city             = document.getElementById('tp-city')?.value || ''
-        formData.state            = document.getElementById('tp-state')?.value || 'PA'
-        formData.linkedin         = document.getElementById('tp-linkedin')?.value || ''
-        formData.password         = document.getElementById('tp-password')?.value || ''
+        formData.last_name = document.getElementById('tp-last-name')?.value || ''
+        formData.email = document.getElementById('tp-email')?.value || ''
+        formData.phone = document.getElementById('tp-phone')?.value || ''
+        formData.city = document.getElementById('tp-city')?.value || ''
+        formData.state = document.getElementById('tp-state')?.value || 'PA'
+        formData.linkedin = document.getElementById('tp-linkedin')?.value || ''
+        formData.password = document.getElementById('tp-password')?.value || ''
         formData.password_confirm = document.getElementById('tp-password-confirm')?.value || ''
         break
 
       case 2:
-        formData.interest_area       = document.getElementById('tp-interest-area')?.value || ''
-        formData.desired_role        = document.getElementById('tp-desired-role')?.value || ''
+        formData.interest_area = document.getElementById('tp-interest-area')?.value || ''
+        formData.desired_role = document.getElementById('tp-desired-role')?.value || ''
         formData.travel_availability = document.getElementById('tp-travel')?.value || ''
-        formData.driver_license      = document.getElementById('tp-cnh')?.value || ''
-        formData.desired_pay         = document.getElementById('tp-desired-pay')?.value || ''
-        formData.can_relocate        = document.getElementById('tp-relocate')?.checked ? '1' : '0'
+        formData.driver_license = document.getElementById('tp-cnh')?.value || ''
+        formData.desired_pay = document.getElementById('tp-desired-pay')?.value || ''
+        formData.can_relocate = document.getElementById('tp-relocate')?.checked ? '1' : '0'
         break
 
-      case 3:
+      case 3: {
         const eduCards = document.querySelectorAll('.edu-card')
-        formData.educations = Array.from(eduCards).map(card => ({
+        formData.educations = Array.from(eduCards).map((card) => ({
           level: card.querySelector('.edu-level')?.value || 'Superior Completo',
           course: card.querySelector('.edu-course')?.value || '',
           institution: card.querySelector('.edu-institution')?.value || '',
           year: card.querySelector('.edu-year')?.value || '',
-          status: 'Concluído'
+          status: 'Concluído',
         }))
         if (!formData.educations.length) {
-          formData.educations = [{ level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' }]
+          formData.educations = [
+            { level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' },
+          ]
         }
         break
+      }
 
-      case 4:
+      case 4: {
         formData.notes = document.getElementById('tp-notes')?.value || ''
         const expCards = document.querySelectorAll('.exp-card')
-        formData.experiences = Array.from(expCards).map(card => ({
+        formData.experiences = Array.from(expCards).map((card) => ({
           role: card.querySelector('.exp-role')?.value || '',
           company: card.querySelector('.exp-company')?.value || '',
           period: card.querySelector('.exp-period')?.value || '',
@@ -691,21 +734,29 @@ export async function renderTalentPoolRegister(params, appEl) {
           formData.experiences = [{ role: '', company: '', period: '', activities: '' }]
         }
         break
+      }
 
-      case 5:
+      case 5: {
         const otherSkills = document.getElementById('tp-other-skills')?.value || ''
-        const otherList = otherSkills.split(',').map(s => s.trim()).filter(Boolean)
-        const selectedPills = Array.from(document.querySelectorAll('.skill-pill-btn.selected')).map(b => b.dataset.skill)
+        const otherList = otherSkills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+        const selectedPills = Array.from(document.querySelectorAll('.skill-pill-btn.selected')).map(
+          (b) => b.dataset.skill
+        )
         formData.key_skills = Array.from(new Set([...selectedPills, ...otherList]))
         break
+      }
 
-      case 6:
+      case 6: {
         formData.consent_lgpd = document.getElementById('tp-consent')?.checked || false
         const fileInput = document.getElementById('tp-resume')
         if (fileInput?.files?.[0]) {
           formData.resume = fileInput.files[0]
         }
         break
+      }
     }
   }
 
@@ -730,11 +781,19 @@ export async function renderTalentPoolRegister(params, appEl) {
           return false
         }
         if (!formData.password || formData.password.length < 8) {
-          showToast({ title: 'Senha Obrigatória', message: 'Crie uma senha com no mínimo 8 caracteres para seu perfil.', type: 'error' })
+          showToast({
+            title: 'Senha Obrigatória',
+            message: 'Crie uma senha com no mínimo 8 caracteres para seu perfil.',
+            type: 'error',
+          })
           return false
         }
         if (formData.password !== formData.password_confirm) {
-          showToast({ title: 'Senhas Diferentes', message: 'A confirmação de senha não coincide com a senha criada.', type: 'error' })
+          showToast({
+            title: 'Senhas Diferentes',
+            message: 'A confirmação de senha não coincide com a senha criada.',
+            type: 'error',
+          })
           return false
         }
         return true
@@ -750,32 +809,42 @@ export async function renderTalentPoolRegister(params, appEl) {
         }
         return true
 
-      case 3:
+      case 3: {
         const firstEdu = formData.educations[0]
         if (!firstEdu || !firstEdu.course.trim()) {
           showToast({ title: 'Atenção', message: 'Informe o curso ou área de formação.', type: 'error' })
           return false
         }
         return true
+      }
 
-      case 4:
+      case 4: {
         if (!formData.notes.trim()) {
           showToast({ title: 'Atenção', message: 'Preencha seu resumo profissional / apresentação.', type: 'error' })
           return false
         }
         const firstExp = formData.experiences[0]
         if (!firstExp || !firstExp.role.trim() || !firstExp.company.trim()) {
-          showToast({ title: 'Atenção', message: 'Preencha pelo menos uma experiência profissional (cargo e empresa).', type: 'error' })
+          showToast({
+            title: 'Atenção',
+            message: 'Preencha pelo menos uma experiência profissional (cargo e empresa).',
+            type: 'error',
+          })
           return false
         }
         return true
+      }
 
       case 5:
         return true
 
       case 6:
         if (!formData.consent_lgpd) {
-          showToast({ title: 'Consentimento Obrigatório', message: 'Você precisa aceitar o termo de consentimento para finalizar.', type: 'error' })
+          showToast({
+            title: 'Consentimento Obrigatório',
+            message: 'Você precisa aceitar o termo de consentimento para finalizar.',
+            type: 'error',
+          })
           return false
         }
         return true
@@ -787,11 +856,17 @@ export async function renderTalentPoolRegister(params, appEl) {
     // Adicionar / Remover Formações
     document.getElementById('add-education-btn')?.addEventListener('click', () => {
       saveCurrentStepData()
-      formData.educations.push({ level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' })
+      formData.educations.push({
+        level: 'Superior Completo',
+        course: '',
+        institution: '',
+        year: '',
+        status: 'Concluído',
+      })
       render()
     })
 
-    document.querySelectorAll('.remove-edu-btn').forEach(btn => {
+    document.querySelectorAll('.remove-edu-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.idx)
         saveCurrentStepData()
@@ -807,7 +882,7 @@ export async function renderTalentPoolRegister(params, appEl) {
       render()
     })
 
-    document.querySelectorAll('.remove-exp-btn').forEach(btn => {
+    document.querySelectorAll('.remove-exp-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.idx)
         saveCurrentStepData()
@@ -838,7 +913,7 @@ export async function renderTalentPoolRegister(params, appEl) {
     })
 
     // Skills pills toggle
-    document.querySelectorAll('.skill-pill-btn').forEach(btn => {
+    document.querySelectorAll('.skill-pill-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         btn.classList.toggle('selected')
         const isSelected = btn.classList.contains('selected')
@@ -903,7 +978,9 @@ export async function renderTalentPoolRegister(params, appEl) {
       } catch (err) {
         showToast({ title: 'Erro na Inscrição', message: err.message, type: 'error' })
         submitBtn.disabled = false
-        submitBtn.querySelector('span').textContent = targetJob ? 'Confirmar Candidatura & Salvar Perfil' : 'Concluir Cadastro no Banco de Talentos'
+        submitBtn.querySelector('span').textContent = targetJob
+          ? 'Confirmar Candidatura & Salvar Perfil'
+          : 'Concluir Cadastro no Banco de Talentos'
       }
     })
   }
@@ -921,14 +998,15 @@ export async function renderTalentPoolRegister(params, appEl) {
             ">✓</div>
 
             <h2 style="font-size: 1.875rem; font-weight: 800; color: var(--ael-ink); margin-bottom: 0.75rem;">
-              ${jobTitle ? 'Candidatura Enviada com Sucesso!' : (isNew ? 'Perfil Cadastrado com Sucesso!' : 'Perfil Atualizado com Sucesso!')}
+              ${jobTitle ? 'Candidatura Enviada com Sucesso!' : isNew ? 'Perfil Cadastrado com Sucesso!' : 'Perfil Atualizado com Sucesso!'}
             </h2>
 
             <p style="color: var(--ael-text); font-size: 1rem; line-height: 1.6; margin-bottom: 2rem;">
               Olá, <strong>${escHtml(name)}</strong>!
-              ${jobTitle
-                ? `Sua candidatura para a vaga <strong>"${escHtml(jobTitle)}"</strong> foi confirmada e seus dados estruturados foram salvos no Banco de Talentos da A&L Engenharia.`
-                : `Seu perfil profissional estruturado foi cadastrado no Banco de Talentos oficial da A&L Engenharia.`
+              ${
+                jobTitle
+                  ? `Sua candidatura para a vaga <strong>"${escHtml(jobTitle)}"</strong> foi confirmada e seus dados estruturados foram salvos no Banco de Talentos da A&L Engenharia.`
+                  : `Seu perfil profissional estruturado foi cadastrado no Banco de Talentos oficial da A&L Engenharia.`
               }
               Nossa equipe de RH entrará em contato diretamente com você via WhatsApp ou Telefone.
             </p>
@@ -951,6 +1029,12 @@ export async function renderTalentPoolRegister(params, appEl) {
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
-function escAttr(s) { return escHtml(s) }
+function escAttr(s) {
+  return escHtml(s)
+}

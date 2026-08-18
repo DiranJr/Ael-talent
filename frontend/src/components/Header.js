@@ -51,7 +51,7 @@ export function renderHeader() {
   // Marca link ativo baseado na rota
   const updateActive = () => {
     const hash = window.location.hash.slice(1) || '/'
-    header.querySelectorAll('.nav-link[data-route]').forEach(link => {
+    header.querySelectorAll('.nav-link[data-route]').forEach((link) => {
       const route = link.dataset.route
       link.classList.toggle('active', hash === route || (route !== '/' && hash.startsWith(route)))
     })
@@ -73,6 +73,6 @@ export function renderHeader() {
     cleanup: () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('hashchange', updateActive)
-    }
+    },
   }
 }

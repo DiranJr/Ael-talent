@@ -2,12 +2,19 @@
  * A&L Talent Admin — Gestão de Departamentos da Empresa
  */
 
-import { adminGetDepartments, adminCreateDepartment, adminDeleteDepartment } from '../../api.js'
-import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
-import { navigate } from '../../router.js'
+import { adminCreateDepartment, adminDeleteDepartment, adminGetDepartments } from '../../api.js'
+import { bindAdminLayoutEvents, renderAdminLayout } from '../../components/AdminLayout.js'
 import { showToast } from '../../components/Toast.js'
+import { navigate } from '../../router.js'
 
 export async function renderAdminDepartments(params, appEl) {
+  // Renderiza Skeleton imediato
+  appEl.innerHTML = renderAdminLayout(renderDepartmentsSkeleton(), {
+    title: 'Departamentos da Empresa',
+    activeRoute: '/admin/departments',
+  })
+  bindAdminLayoutEvents(appEl)
+
   let departments = []
   try {
     const res = await adminGetDepartments()
@@ -82,6 +89,42 @@ export async function renderAdminDepartments(params, appEl) {
   bindDeptEvents(appEl, departments)
 }
 
+function renderDepartmentsSkeleton() {
+  return `
+    <div style="display: grid; grid-template-columns: 1.4fr 1fr; gap: 1.5rem; align-items: start;" aria-hidden="true">
+      <div class="data-card">
+        <div class="data-card-header">
+          <div class="skeleton" style="width: 180px; height: 18px;"></div>
+        </div>
+        <div style="padding: 1rem; display: flex; flex-direction: column; gap: 0.75rem;">
+          ${[1, 2, 3, 4]
+            .map(
+              () => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 0;border-bottom:1px solid var(--ael-line);">
+              <div class="skeleton" style="width: 50%; height: 16px;"></div>
+              <div class="skeleton skeleton-pill"></div>
+              <div class="skeleton" style="width: 32px; height: 32px; border-radius: 4px;"></div>
+            </div>
+          `
+            )
+            .join('')}
+        </div>
+      </div>
+
+      <div class="data-card">
+        <div class="data-card-header">
+          <div class="skeleton" style="width: 160px; height: 18px;"></div>
+        </div>
+        <div style="padding: 1.5rem; display: flex; flex-direction: column; gap: 1rem;">
+          <div class="skeleton" style="width: 40%; height: 14px;"></div>
+          <div class="skeleton" style="width: 100%; height: 42px; border-radius: 6px;"></div>
+          <div class="skeleton" style="width: 100%; height: 44px; border-radius: 6px; margin-top: 0.5rem;"></div>
+        </div>
+      </div>
+    </div>
+  `
+}
+
 function renderDeptRows(departments) {
   if (!departments.length) {
     return `
@@ -93,7 +136,9 @@ function renderDeptRows(departments) {
     `
   }
 
-  return departments.map(d => `
+  return departments
+    .map(
+      (d) => `
     <tr data-id="${d.company_department_id}">
       <td>
         <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">${escHtml(d.name)}</div>
@@ -111,12 +156,14 @@ function renderDeptRows(departments) {
         </div>
       </td>
     </tr>
-  `).join('')
+  `
+    )
+    .join('')
 }
 
 function bindDeptEvents(appEl, initialDepts) {
   const form = document.getElementById('add-dept-form')
-  const btn  = document.getElementById('add-dept-btn')
+  const btn = document.getElementById('add-dept-btn')
   const nameInput = document.getElementById('new-dept-name')
 
   async function reload() {
@@ -130,17 +177,20 @@ function bindDeptEvents(appEl, initialDepts) {
   }
 
   function bindDeleteEvents() {
-    appEl.querySelectorAll('.delete-dept-btn').forEach(b => {
+    appEl.querySelectorAll('.delete-dept-btn').forEach((b) => {
       b.addEventListener('click', async () => {
-        const id   = b.dataset.id
+        if (b.disabled) return
+        const id = b.dataset.id
         const name = b.dataset.name
         if (confirm(`Deseja excluir o departamento "${name}"?`)) {
+          b.disabled = true
           try {
             await adminDeleteDepartment(id)
             showToast({ title: 'Departamento Excluído', message: `Área "${name}" removida.`, type: 'success' })
             reload()
           } catch (err) {
             showToast({ title: 'Erro', message: err.message, type: 'error' })
+            b.disabled = false
           }
         }
       })
@@ -157,7 +207,11 @@ function bindDeptEvents(appEl, initialDepts) {
 
     try {
       await adminCreateDepartment(name)
-      showToast({ title: 'Departamento Cadastrado', message: `Área "${name}" disponível com sucesso!`, type: 'success' })
+      showToast({
+        title: 'Departamento Cadastrado',
+        message: `Área "${name}" disponível com sucesso!`,
+        type: 'success',
+      })
       nameInput.value = ''
       reload()
     } catch (err) {
@@ -172,6 +226,12 @@ function bindDeptEvents(appEl, initialDepts) {
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
-function escAttr(s) { return escHtml(s) }
+function escAttr(s) {
+  return escHtml(s)
+}

@@ -9,6 +9,11 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
+    "lint": "biome check src server",
+    "lint:fix": "biome check --write src server",
+    "format": "biome format --write src server",
+    "test:unit": "vitest run test/unit",
+    "test:e2e": "playwright test",
     "test:audit": "node test_audit_suite.js",
     "test:hardening": "node test_hardening_suite.js",
     "test:homologation": "node test_homologation_suite.js",
@@ -16,8 +21,11 @@
     "test:all": "node test_hardening_suite.js && node test_audit_suite.js && node test_homologation_suite.js && node test_recruiter_feature.js"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.9",
+    "@playwright/test": "1.62.1",
     "concurrently": "^9.2.4",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "4.1.10"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

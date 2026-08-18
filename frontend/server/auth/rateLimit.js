@@ -17,8 +17,8 @@ export const authLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',
   message: {
-    error: 'Muitas tentativas de autenticação a partir deste endereço. Tente novamente em 15 minutos.'
-  }
+    error: 'Muitas tentativas de autenticação a partir deste endereço. Tente novamente em 15 minutos.',
+  },
 })
 
 /**
@@ -32,8 +32,8 @@ export const passwordResetLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',
   message: {
-    error: 'Muitas solicitações de recuperação de senha. Tente novamente em 15 minutos.'
-  }
+    error: 'Muitas solicitações de recuperação de senha. Tente novamente em 15 minutos.',
+  },
 })
 
 /**
@@ -47,8 +47,8 @@ export const adminAuthLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',
   message: {
-    message: 'Muitas tentativas de login administrativo. Tente novamente em 15 minutos.'
-  }
+    message: 'Muitas tentativas de login administrativo. Tente novamente em 15 minutos.',
+  },
 })
 
 /**
@@ -62,7 +62,6 @@ export const registrationLimiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => isTestEnv() && req.headers['x-test-bypass'] === 'ael-test-suite',
   message: {
-    error: 'Limite de envios atingido. Aguarde alguns minutos antes de tentar novamente.'
-  }
+    error: 'Limite de envios atingido. Aguarde alguns minutos antes de tentar novamente.',
+  },
 })
-

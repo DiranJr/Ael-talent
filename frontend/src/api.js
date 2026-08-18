@@ -63,9 +63,9 @@ async function apiFetch(path, options = {}) {
 /** Lista vagas publicadas com filtros opcionais */
 export async function getJobs({ search = '', department = '', location = '' } = {}) {
   const params = new URLSearchParams()
-  if (search)     params.set('q', search)
+  if (search) params.set('q', search)
   if (department) params.set('department', department)
-  if (location)   params.set('location', location)
+  if (location) params.set('location', location)
 
   const qs = params.toString() ? `?${params}` : ''
   return apiFetch(`/jobs${qs}`)
@@ -157,8 +157,8 @@ export async function adminDeleteJob(id) {
 export async function adminGetCandidates({ joborder_id = '', status = '', search = '' } = {}) {
   const params = new URLSearchParams()
   if (joborder_id) params.set('joborder_id', joborder_id)
-  if (status)       params.set('status', status)
-  if (search)       params.set('search', search)
+  if (status) params.set('status', status)
+  if (search) params.set('search', search)
   const qs = params.toString() ? `?${params}` : ''
   return apiFetch(`/admin/candidates${qs}`)
 }
@@ -339,4 +339,3 @@ export async function candidateResetPassword(token, password) {
     body: JSON.stringify({ token, password }),
   })
 }
-

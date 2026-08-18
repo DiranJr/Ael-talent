@@ -4,18 +4,25 @@
  */
 
 import {
+  adminAssignCandidateToJob,
+  adminGetDepartments,
+  adminGetJobs,
   adminGetTalentPool,
   adminGetTalentPoolCandidateDetail,
-  adminAssignCandidateToJob,
-  adminGetJobs,
-  adminGetDepartments,
   getAttachmentDownloadUrl,
 } from '../../api.js'
-import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
-import { navigate } from '../../router.js'
+import { bindAdminLayoutEvents, renderAdminLayout } from '../../components/AdminLayout.js'
 import { showToast } from '../../components/Toast.js'
+import { navigate } from '../../router.js'
 
 export async function renderAdminTalentPool(params, appEl) {
+  // Renderiza Skeleton imediato
+  appEl.innerHTML = renderAdminLayout(renderTalentPoolSkeleton(), {
+    title: 'Banco de Talentos',
+    activeRoute: '/admin/talent-pool',
+  })
+  bindAdminLayoutEvents(appEl)
+
   let candidates = []
   let jobs = []
   let departments = []
@@ -26,8 +33,8 @@ export async function renderAdminTalentPool(params, appEl) {
       adminGetJobs({ status: 'active' }),
       adminGetDepartments(),
     ])
-    candidates  = tpRes.candidates || []
-    jobs        = jobsRes.jobs || []
+    candidates = tpRes.candidates || []
+    jobs = jobsRes.jobs || []
     departments = deptRes.departments || []
   } catch (err) {
     if (err.message.includes('401')) {
@@ -55,7 +62,7 @@ export async function renderAdminTalentPool(params, appEl) {
         <div style="width: 180px;">
           <select id="tp-filter-area" class="form-control" style="padding: 0.5rem 0.75rem; font-size: 0.875rem;">
             <option value="">Todas as Áreas</option>
-            ${departments.map(d => `<option value="${escAttr(d.name)}">${escHtml(d.name)}</option>`).join('')}
+            ${departments.map((d) => `<option value="${escAttr(d.name)}">${escHtml(d.name)}</option>`).join('')}
             <option value="Operacional">Operacional</option>
             <option value="Engenharia">Engenharia</option>
             <option value="Administrativo">Administrativo</option>
@@ -148,11 +155,15 @@ export async function renderAdminTalentPool(params, appEl) {
             <label class="form-label" for="assign-job-select">Selecione a Oportunidade *</label>
             <select id="assign-job-select" class="form-control" required>
               <option value="">Selecione uma vaga...</option>
-              ${jobs.map(j => `
+              ${jobs
+                .map(
+                  (j) => `
                 <option value="${j.joborder_id}">
                   ${escHtml(j.title)} (${escHtml(j.city || 'Parauapebas')} - ${escHtml(j.department_name || 'Geral')})
                 </option>
-              `).join('')}
+              `
+                )
+                .join('')}
             </select>
           </div>
 
@@ -193,8 +204,9 @@ function renderCandidatesRows(candidates) {
     `
   }
 
-  return candidates.map(c => {
-    return `
+  return candidates
+    .map((c) => {
+      return `
       <tr data-id="${c.candidate_id}">
         <td>
           <div style="font-weight: 700; color: var(--ael-ink); font-size: 0.9375rem;">
@@ -235,7 +247,10 @@ function renderCandidatesRows(candidates) {
 
         <td>
           <div style="display: flex; flex-wrap: wrap; gap: 0.25rem; max-width: 220px;">
-            ${(c.key_skills || []).slice(0, 3).map(skill => `
+            ${(c.key_skills || [])
+              .slice(0, 3)
+              .map(
+                (skill) => `
               <span style="
                 background: rgba(0,91,58,0.08);
                 color: var(--ael-green-dark);
@@ -244,22 +259,32 @@ function renderCandidatesRows(candidates) {
                 border-radius: 4px;
                 font-weight: 600;
               ">${escHtml(skill)}</span>
-            `).join('')}
+            `
+              )
+              .join('')}
             ${(c.key_skills || []).length > 3 ? `<span style="font-size: 0.6875rem; color: var(--ael-muted);">+${c.key_skills.length - 3}</span>` : ''}
           </div>
         </td>
 
         <td>
           <div class="table-actions" style="justify-content: flex-end;">
-            ${c.whatsapp_link ? `
+            ${
+              c.whatsapp_link
+                ? `
               <a href="${c.whatsapp_link}" target="_blank" class="btn-icon whatsapp" title="Conversar no WhatsApp (${escAttr(c.phone)})">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
-              </a>` : ''}
+              </a>`
+                : ''
+            }
 
-            ${c.attachment_id ? `
+            ${
+              c.attachment_id
+                ? `
               <a href="${getAttachmentDownloadUrl(c.attachment_id)}" target="_blank" rel="noopener" class="btn-icon" title="Baixar Currículo">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
-              </a>` : ''}
+              </a>`
+                : ''
+            }
 
             <button type="button" class="btn-icon view-detail-btn" data-id="${c.candidate_id}" title="Ver Perfil Completo">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -272,16 +297,17 @@ function renderCandidatesRows(candidates) {
         </td>
       </tr>
     `
-  }).join('')
+    })
+    .join('')
 }
 
 function bindTalentPoolEvents(appEl, initialCandidates, jobs) {
   let candidates = initialCandidates
 
   const searchInput = document.getElementById('tp-search-input')
-  const areaSelect   = document.getElementById('tp-filter-area')
-  const expSelect    = document.getElementById('tp-filter-exp')
-  const eduSelect    = document.getElementById('tp-filter-edu')
+  const areaSelect = document.getElementById('tp-filter-area')
+  const expSelect = document.getElementById('tp-filter-exp')
+  const eduSelect = document.getElementById('tp-filter-edu')
 
   async function refetch() {
     try {
@@ -324,7 +350,9 @@ function bindTalentPoolEvents(appEl, initialCandidates, jobs) {
       detailModal.style.display = 'flex'
       const bodyEl = document.getElementById('modal-cand-body')
       const titleEl = document.getElementById('modal-cand-title')
-      if (bodyEl) bodyEl.innerHTML = '<div style="text-align: center; padding: 2.5rem; color: var(--ael-muted);">Carregando perfil completo...</div>'
+      if (bodyEl)
+        bodyEl.innerHTML =
+          '<div style="text-align: center; padding: 2.5rem; color: var(--ael-muted);">Carregando perfil completo...</div>'
 
       try {
         const res = await adminGetTalentPoolCandidateDetail(id)
@@ -332,7 +360,8 @@ function bindTalentPoolEvents(appEl, initialCandidates, jobs) {
         if (titleEl) titleEl.textContent = cand.full_name || 'Perfil Profissional'
         if (bodyEl) bodyEl.innerHTML = renderCandidateDetailHtml(cand)
       } catch (err) {
-        if (bodyEl) bodyEl.innerHTML = `<div style="color: var(--ael-red); padding: 1.5rem; text-align: center;">${err.message}</div>`
+        if (bodyEl)
+          bodyEl.innerHTML = `<div style="color: var(--ael-red); padding: 1.5rem; text-align: center;">${err.message}</div>`
       }
       return
     }
@@ -357,7 +386,12 @@ function bindTalentPoolEvents(appEl, initialCandidates, jobs) {
       return
     }
 
-    if (assignModal && (e.target === assignModal || e.target.closest('#close-assign-modal-btn') || e.target.closest('#cancel-assign-btn'))) {
+    if (
+      assignModal &&
+      (e.target === assignModal ||
+        e.target.closest('#close-assign-modal-btn') ||
+        e.target.closest('#cancel-assign-btn'))
+    ) {
       assignModal.style.display = 'none'
       return
     }
@@ -367,11 +401,15 @@ function bindTalentPoolEvents(appEl, initialCandidates, jobs) {
   document.getElementById('confirm-assign-btn')?.addEventListener('click', async (e) => {
     e.preventDefault()
     const candidateId = document.getElementById('assign-cand-id')?.value
-    const jobId       = document.getElementById('assign-job-select')?.value
-    const status      = document.getElementById('assign-status-select')?.value || 100
+    const jobId = document.getElementById('assign-job-select')?.value
+    const status = document.getElementById('assign-status-select')?.value || 100
 
     if (!jobId) {
-      showToast({ title: 'Atenção', message: 'Selecione uma oportunidade para vincular o profissional.', type: 'error' })
+      showToast({
+        title: 'Atenção',
+        message: 'Selecione uma oportunidade para vincular o profissional.',
+        type: 'error',
+      })
       return
     }
 
@@ -405,9 +443,12 @@ function renderCandidateDetailHtml(c) {
   const mainAttachmentId = c.attachment_id || atts[0]?.attachment_id
   const skills = Array.isArray(c.key_skills)
     ? c.key_skills
-    : (typeof c.key_skills === 'string' && c.key_skills.trim()
-        ? c.key_skills.split(',').map(s => s.trim()).filter(Boolean)
-        : [])
+    : typeof c.key_skills === 'string' && c.key_skills.trim()
+      ? c.key_skills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : []
 
   return `
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
@@ -423,7 +464,9 @@ function renderCandidateDetailHtml(c) {
       </div>
     </div>
 
-    ${mainAttachmentId ? `
+    ${
+      mainAttachmentId
+        ? `
       <div style="margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: center; background: rgba(0, 91, 58, 0.06); padding: 0.75rem 1rem; border-radius: var(--ael-radius-md); border: 1px solid rgba(0, 91, 58, 0.15);">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--ael-green-base); flex-shrink: 0;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
         <div style="flex: 1;">
@@ -434,7 +477,9 @@ function renderCandidateDetailHtml(c) {
           📄 Abrir / Baixar
         </a>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <div style="background: var(--ael-surface); border-radius: var(--ael-radius-md); padding: 1rem; margin-bottom: 1.25rem; font-size: 0.875rem;">
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
@@ -449,36 +494,52 @@ function renderCandidateDetailHtml(c) {
       </div>
     </div>
 
-    ${c.notes ? `
+    ${
+      c.notes
+        ? `
       <div style="margin-bottom: 1.25rem;">
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem; margin-bottom: 0.25rem;">Resumo Profissional</span>
         <p style="font-size: 0.875rem; color: var(--ael-ink); line-height: 1.6; background: #ffffff; border: 1px solid var(--ael-line); border-radius: var(--ael-radius-md); padding: 0.75rem;">
           ${escHtml(c.notes)}
         </p>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
 
-    ${skills.length ? `
+    ${
+      skills.length
+        ? `
       <div style="margin-bottom: 1.25rem;">
         <span style="color: var(--ael-muted); display: block; font-size: 0.75rem; margin-bottom: 0.35rem;">Competências Técnicas</span>
         <div style="display: flex; flex-wrap: wrap; gap: 0.375rem;">
-          ${skills.map(s => `
+          ${skills
+            .map(
+              (s) => `
             <span style="background: rgba(0,91,58,0.1); color: var(--ael-green-dark); font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: 600;">
               ${escHtml(String(s).trim())}
             </span>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       </div>
-    ` : ''}
+    `
+        : ''
+    }
 
     <!-- CANDIDATURAS / VAGAS ASSOCIADAS -->
     <div style="margin-bottom: 1.25rem;">
       <span style="font-size: 0.8125rem; font-weight: 700; color: var(--ael-ink); display: block; margin-bottom: 0.5rem;">
         Processos Seletivos em Andamento (${apps.length})
       </span>
-      ${apps.length ? `
+      ${
+        apps.length
+          ? `
         <div style="display: flex; flex-direction: column; gap: 0.5rem;">
-          ${apps.map(a => `
+          ${apps
+            .map(
+              (a) => `
             <div style="display: flex; justify-content: space-between; align-items: center; background: #ffffff; border: 1px solid var(--ael-line); padding: 0.625rem 0.875rem; border-radius: var(--ael-radius-md); font-size: 0.8125rem;">
               <div>
                 <strong>${escHtml(a.job_title)}</strong>
@@ -486,9 +547,13 @@ function renderCandidateDetailHtml(c) {
               </div>
               <span class="status-pill green">${escHtml(a.status_label || 'Em Triagem')}</span>
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
-      ` : `<div style="font-size: 0.8125rem; color: var(--ael-muted);">Nenhuma vaga vinculada ainda.</div>`}
+      `
+          : `<div style="font-size: 0.8125rem; color: var(--ael-muted);">Nenhuma vaga vinculada ainda.</div>`
+      }
     </div>
 
     <!-- LINHA DO TEMPO / ATIVIDADES -->
@@ -497,22 +562,81 @@ function renderCandidateDetailHtml(c) {
         Histórico de Atividades
       </span>
       <div style="display: flex; flex-direction: column; gap: 0.375rem; font-size: 0.75rem;">
-        ${acts.map(act => `
+        ${acts
+          .map(
+            (act) => `
           <div style="color: var(--ael-text); display: flex; gap: 0.5rem;">
             <span style="color: var(--ael-muted); min-width: 110px;">${formatDate(act.date_created)}:</span>
             <span>${escHtml(act.notes)}</span>
           </div>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
     </div>
   `
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
-function escAttr(s) { return escHtml(s) }
+function escAttr(s) {
+  return escHtml(s)
+}
 function formatDate(str) {
-  try { return new Date(str).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) }
-  catch { return '' }
+  try {
+    return new Date(str).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  } catch {
+    return ''
+  }
+}
+
+function renderTalentPoolSkeleton() {
+  return `
+    <div class="data-card" style="margin-bottom: 1.5rem; padding: 1.25rem;" aria-hidden="true">
+      <div style="display: flex; gap: 0.875rem; align-items: center; flex-wrap: wrap;">
+        <div class="skeleton" style="flex: 1; height: 38px; border-radius: 6px;"></div>
+        <div class="skeleton" style="width: 180px; height: 38px; border-radius: 6px;"></div>
+        <div class="skeleton" style="width: 180px; height: 38px; border-radius: 6px;"></div>
+        <div class="skeleton" style="width: 180px; height: 38px; border-radius: 6px;"></div>
+      </div>
+    </div>
+
+    <div class="data-card" aria-hidden="true">
+      <div class="data-card-header">
+        <div class="skeleton" style="width: 220px; height: 18px;"></div>
+      </div>
+      <div style="padding: 1rem; display: flex; flex-direction: column; gap: 0.875rem;">
+        ${[1, 2, 3, 4, 5, 6]
+          .map(
+            () => `
+          <div style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1.5fr 1fr; gap: 1rem; align-items: center; padding: 0.875rem 0; border-bottom: 1px solid var(--ael-line);">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <div class="skeleton skeleton-circle"></div>
+              <div style="display: flex; flex-direction: column; gap: 0.35rem; flex: 1;">
+                <div class="skeleton" style="width: 75%; height: 16px;"></div>
+                <div class="skeleton" style="width: 50%; height: 12px;"></div>
+              </div>
+            </div>
+            <div class="skeleton skeleton-pill"></div>
+            <div class="skeleton" style="width: 70%; height: 14px;"></div>
+            <div style="display: flex; gap: 0.35rem;">
+              <div class="skeleton" style="width: 50px; height: 20px; border-radius: 4px;"></div>
+              <div class="skeleton" style="width: 60px; height: 20px; border-radius: 4px;"></div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+              <div class="skeleton" style="width: 75px; height: 28px; border-radius: 4px;"></div>
+              <div class="skeleton" style="width: 65px; height: 28px; border-radius: 4px;"></div>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    </div>
+  `
 }

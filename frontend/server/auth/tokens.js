@@ -7,7 +7,7 @@ import crypto from 'crypto'
 const isProd = process.env.NODE_ENV === 'production'
 
 const CANDIDATE_SECRET = process.env.SESSION_SECRET || 'ael_talent_candidate_secret_2024'
-const ADMIN_SECRET     = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || 'ael_talent_admin_secret_2024'
+const ADMIN_SECRET = process.env.ADMIN_SESSION_SECRET || process.env.SESSION_SECRET || 'ael_talent_admin_secret_2024'
 
 if (isProd) {
   if (CANDIDATE_SECRET === 'ael_talent_candidate_secret_2024' || CANDIDATE_SECRET.length < 32) {
@@ -21,7 +21,7 @@ if (isProd) {
 }
 
 const CANDIDATE_EXP_MS = 30 * 24 * 60 * 60 * 1000 // 30 dias
-const ADMIN_EXP_MS     = 24 * 60 * 60 * 1000      // 24 horas
+const ADMIN_EXP_MS = 24 * 60 * 60 * 1000 // 24 horas
 
 /**
  * Emite token assinado para o candidato

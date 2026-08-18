@@ -3,17 +3,13 @@
  * Rota: #/admin/users
  */
 
-import { adminGetUsers, adminCreateUser, adminUpdateUser, adminDeleteUser, getAdminUser } from '../../api.js'
+import { adminCreateUser, adminDeleteUser, adminGetUsers, adminUpdateUser, getAdminUser } from '../../api.js'
 import { renderAdminLayout } from '../../components/AdminLayout.js'
 import { showToast } from '../../components/Toast.js'
 
 function escHtml(str) {
   if (!str) return ''
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 export async function renderAdminUsers(params, appEl) {
@@ -36,12 +32,14 @@ export async function renderAdminUsers(params, appEl) {
   }
 
   function render() {
-    const topActions = isAdmin ? `
+    const topActions = isAdmin
+      ? `
       <button class="btn btn-primary btn-sm" id="btn-create-user">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>
         <span>Novo Recrutador / Acesso</span>
       </button>
-    ` : ''
+    `
+      : ''
 
     const contentHtml = `
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
@@ -53,24 +51,30 @@ export async function renderAdminUsers(params, appEl) {
         </span>
       </div>
 
-      ${isLoading ? `
+      ${
+        isLoading
+          ? `
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.25rem;">
           <div class="skeleton-card" style="height: 180px;"></div>
           <div class="skeleton-card" style="height: 180px;"></div>
           <div class="skeleton-card" style="height: 180px;"></div>
         </div>
-      ` : users.length === 0 ? `
+      `
+          : users.length === 0
+            ? `
         <div class="empty-state">
           <div class="empty-state-icon">👥</div>
           <h3>Nenhum usuário cadastrado</h3>
           <p>Adicione recrutadores para conduzir triagens e processos seletivos.</p>
         </div>
-      ` : `
+      `
+            : `
         <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.25rem;">
-          ${users.map(u => {
-            const isSelf = u.user_id === currentUser.user_id
-            const isUserAdmin = u.access_level >= 400
-            return `
+          ${users
+            .map((u) => {
+              const isSelf = u.user_id === currentUser.user_id
+              const isUserAdmin = u.access_level >= 400
+              return `
               <div class="data-card" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; margin-bottom: 0;">
                 <div>
                   <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 1rem;">
@@ -102,12 +106,16 @@ export async function renderAdminUsers(params, appEl) {
                   </div>
 
                   <div style="font-size: 0.8125rem; color: var(--ael-ink); margin-bottom: 0.75rem; display: flex; flex-direction: column; gap: 0.35rem;">
-                    ${u.email ? `
+                    ${
+                      u.email
+                        ? `
                       <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--ael-muted);">
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                         <span style="word-break: break-all;">${escHtml(u.email)}</span>
                       </div>
-                    ` : ''}
+                    `
+                        : ''
+                    }
                     <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--ael-green-base); font-weight: 600; margin-top: 0.25rem;">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
                       <span>${u.active_jobs_count || 0} vaga(s) ativa(s) sob gestão</span>
@@ -115,23 +123,33 @@ export async function renderAdminUsers(params, appEl) {
                   </div>
                 </div>
 
-                ${isAdmin ? `
+                ${
+                  isAdmin
+                    ? `
                   <div style="display: flex; gap: 0.5rem; justify-content: flex-end; border-top: 1px solid var(--ael-line); padding-top: 0.875rem; margin-top: 0.5rem;">
                     <button class="admin-action-btn btn-edit-user" data-id="${u.user_id}">
                       ✏️ Editar / Senha
                     </button>
-                    ${!isSelf ? `
+                    ${
+                      !isSelf
+                        ? `
                       <button class="admin-action-btn btn-danger btn-delete-user" data-id="${u.user_id}" data-name="${escHtml(u.full_name)}">
                         🗑 Excluir
                       </button>
-                    ` : ''}
+                    `
+                        : ''
+                    }
                   </div>
-                ` : ''}
+                `
+                    : ''
+                }
               </div>
             `
-          }).join('')}
+            })
+            .join('')}
         </div>
-      `}
+      `
+      }
 
       <!-- MODAL DE CADASTRO / EDIÇÃO -->
       <div id="user-modal-overlay" style="
@@ -203,7 +221,7 @@ export async function renderAdminUsers(params, appEl) {
     appEl.innerHTML = renderAdminLayout(contentHtml, {
       title: 'Equipe & Recrutadores',
       activeRoute: '/admin/users',
-      topActionsHtml: topActions
+      topActionsHtml: topActions,
     })
 
     bindEvents()
@@ -261,20 +279,22 @@ export async function renderAdminUsers(params, appEl) {
     btnCancel?.addEventListener('click', closeModal)
 
     // Editar Usuário
-    appEl.querySelectorAll('.btn-edit-user').forEach(btn => {
+    appEl.querySelectorAll('.btn-edit-user').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = parseInt(btn.dataset.id, 10)
-        const userToEdit = users.find(u => u.user_id === id)
+        const userToEdit = users.find((u) => u.user_id === id)
         if (userToEdit) openModal(userToEdit)
       })
     })
 
     // Excluir Usuário
-    appEl.querySelectorAll('.btn-delete-user').forEach(btn => {
+    appEl.querySelectorAll('.btn-delete-user').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const id = parseInt(btn.dataset.id, 10)
         const name = btn.dataset.name
-        if (confirm(`Tem certeza que deseja remover o acesso de "${name}"? Suas vagas serão atribuídas ao administrador.`)) {
+        if (
+          confirm(`Tem certeza que deseja remover o acesso de "${name}"? Suas vagas serão atribuídas ao administrador.`)
+        ) {
           try {
             await adminDeleteUser(id)
             showToast({ title: 'Sucesso', message: 'Usuário removido.', type: 'success' })
