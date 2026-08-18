@@ -85,7 +85,6 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
   }
 
   function renderForm() {
-
     let cardContent = ''
 
     if (currentMode === 'login') {
@@ -277,7 +276,6 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
         </form>
       `
     } else if (currentMode === 'first_access') {
-
       cardContent = `
         <div style="text-align: center; margin-bottom: 2rem;">
           <div style="
@@ -475,7 +473,6 @@ function renderAuthScreen(appEl, departments, initialParams = {}) {
         btn.textContent = 'Reenviar Código por E-mail'
       }
     })
-
 
     // 3. Submit de Redefinição com Token (Reset)
     document.getElementById('candidate-reset-form')?.addEventListener('submit', async (e) => {

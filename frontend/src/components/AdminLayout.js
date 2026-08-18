@@ -20,7 +20,7 @@ export function renderAdminLayout(
   const isAdmin = (user.access_level || 0) >= 400
 
   const navItems = [
-    { label: 'Dashboard', route: '/admin', icon: dashboardIcon() },
+    { label: 'Painel', route: '/admin', icon: dashboardIcon() },
     { label: 'Vagas', route: '/admin/jobs', icon: briefcaseIcon() },
     { label: 'Candidatos & Triagem', route: '/admin/candidates', icon: usersIcon() },
     { label: 'Banco de Talentos', route: '/admin/talent-pool', icon: talentPoolIcon() },
