@@ -9,16 +9,33 @@
 
 import path from 'path'
 import { fileURLToPath } from 'url'
-import dotenv from 'dotenv'
+import fs from 'fs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 
-// Carrega .env do frontend ou da raiz
-dotenv.config({ path: path.resolve(__dirname, '../frontend/.env') })
-dotenv.config({ path: path.resolve(__dirname, '../.env') })
+// Carrega .env manualmente
+function loadEnv(filePath) {
+  if (fs.existsSync(filePath)) {
+    const content = fs.readFileSync(filePath, 'utf8')
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) continue
+      const idx = trimmed.indexOf('=')
+      if (idx > 0) {
+        const key = trimmed.slice(0, idx).trim()
+        const val = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '')
+        if (!process.env[key]) process.env[key] = val
+      }
+    }
+  }
+}
+
+loadEnv(path.resolve(__dirname, '../frontend/.env'))
+loadEnv(path.resolve(__dirname, '../.env'))
 
 import { sendTestEmail, verifyEmailTransport } from '../frontend/server/email/index.js'
+
 
 async function main() {
   console.log('======================================================================')
