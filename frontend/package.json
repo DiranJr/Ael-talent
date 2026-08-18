@@ -22,8 +22,10 @@
     "test:hardening": "node test_hardening_suite.js",
     "test:homologation": "node test_homologation_suite.js",
     "test:recruiter": "node test_recruiter_feature.js",
-    "test:all": "node test_hardening_suite.js && node test_audit_suite.js && node test_homologation_suite.js && node test_recruiter_feature.js"
+    "test:lifecycle": "node test_complete_lifecycle.js",
+    "test:all": "node test_hardening_suite.js && node test_audit_suite.js && node test_homologation_suite.js && node test_recruiter_feature.js && node test_complete_lifecycle.js"
   },
+
 
   "devDependencies": {
     "@biomejs/biome": "2.5.9",
