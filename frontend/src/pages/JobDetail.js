@@ -6,6 +6,9 @@ import { getJob } from '../api.js'
 import { navigate } from '../router.js'
 
 export async function renderJobDetail({ id }, appEl) {
+  // Skeleton estruturado imediato enquanto busca os dados da vaga
+  appEl.innerHTML = renderJobDetailSkeleton()
+
   let job
   try {
     const data = await getJob(id)
@@ -20,10 +23,10 @@ export async function renderJobDetail({ id }, appEl) {
     return
   }
 
-  const dept     = job.department || job.departmentName || ''
+  const dept = job.department || job.departmentName || ''
   const location = [job.city, job.state].filter(Boolean).join(' — ') || job.location || ''
-  const type     = job.type || 'CLT'
-  const desc     = job.description || ''
+  const type = job.type || 'CLT'
+  const desc = job.description || ''
 
   appEl.innerHTML = `
     <!-- HERO DETALHE -->
@@ -57,21 +60,33 @@ export async function renderJobDetail({ id }, appEl) {
 
         <!-- Meta -->
         <div class="job-detail-meta-row">
-          ${location ? `
+          ${
+            location
+              ? `
             <div class="job-detail-meta-item">
               ${mapPinIcon()}
               <span>${escHtml(location)}</span>
-            </div>` : ''}
-          ${type ? `
+            </div>`
+              : ''
+          }
+          ${
+            type
+              ? `
             <div class="job-detail-meta-item">
               ${briefcaseIcon()}
               <span>${escHtml(type)}</span>
-            </div>` : ''}
-          ${job.date_created ? `
+            </div>`
+              : ''
+          }
+          ${
+            job.date_created
+              ? `
             <div class="job-detail-meta-item">
               ${calendarIcon()}
               <span>Publicada em ${formatDate(job.date_created)}</span>
-            </div>` : ''}
+            </div>`
+              : ''
+          }
         </div>
 
         <!-- CTA rápido -->
@@ -114,16 +129,24 @@ export async function renderJobDetail({ id }, appEl) {
 
               <!-- Detalhes da vaga -->
               <div style="margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--ael-line);">
-                ${dept ? `
+                ${
+                  dept
+                    ? `
                   <div style="display:flex;justify-content:space-between;padding:0.5rem 0;font-size:0.875rem;">
                     <span style="color:var(--ael-muted);">Área</span>
                     <span style="font-weight:600;color:var(--ael-ink);">${escHtml(dept)}</span>
-                  </div>` : ''}
-                ${location ? `
+                  </div>`
+                    : ''
+                }
+                ${
+                  location
+                    ? `
                   <div style="display:flex;justify-content:space-between;padding:0.5rem 0;font-size:0.875rem;border-top:1px solid var(--ael-line);">
                     <span style="color:var(--ael-muted);">Local</span>
                     <span style="font-weight:600;color:var(--ael-ink);">${escHtml(location)}</span>
-                  </div>` : ''}
+                  </div>`
+                    : ''
+                }
                 <div style="display:flex;justify-content:space-between;padding:0.5rem 0;font-size:0.875rem;border-top:1px solid var(--ael-line);">
                   <span style="color:var(--ael-muted);">Regime</span>
                   <span style="font-weight:600;color:var(--ael-ink);">${escHtml(type)}</span>
@@ -179,7 +202,7 @@ function renderDescription(text) {
   // Texto plano → converter quebras em parágrafos
   return text
     .split(/\n\n+/)
-    .map(p => `<p>${escHtml(p.trim()).replace(/\n/g, '<br>')}</p>`)
+    .map((p) => `<p>${escHtml(p.trim()).replace(/\n/g, '<br>')}</p>`)
     .join('')
 }
 
@@ -217,13 +240,18 @@ function notFoundState() {
 /* ─── Helpers ─────────────────────────────────────────────── */
 function escHtml(str) {
   return String(str ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function formatDate(str) {
-  try { return new Date(str).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) }
-  catch { return '' }
+  try {
+    return new Date(str).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  } catch {
+    return ''
+  }
 }
 
 const mapPinIcon = () =>
@@ -254,3 +282,60 @@ const alertIcon = () =>
     <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/>
     <path d="M12 9v4"/><path d="M12 17h.01"/>
   </svg>`
+
+function renderJobDetailSkeleton() {
+  return `
+    <section class="job-detail-hero" aria-hidden="true">
+      <div class="container job-detail-hero-inner">
+        <div style="display:flex;gap:0.5rem;align-items:center;margin-bottom:1.5rem;">
+          <div class="skeleton" style="width:50px;height:14px;background:rgba(255,255,255,0.1);"></div>
+          <span style="color:rgba(255,255,255,0.2);">›</span>
+          <div class="skeleton" style="width:50px;height:14px;background:rgba(255,255,255,0.1);"></div>
+          <span style="color:rgba(255,255,255,0.2);">›</span>
+          <div class="skeleton" style="width:140px;height:14px;background:rgba(255,255,255,0.1);"></div>
+        </div>
+
+        <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem;">
+          <div class="skeleton" style="width:100px;height:24px;border-radius:4px;background:rgba(255,255,255,0.1);"></div>
+          <div class="skeleton" style="width:80px;height:24px;border-radius:4px;background:rgba(255,255,255,0.1);"></div>
+        </div>
+
+        <div class="skeleton" style="width:65%;height:44px;margin-bottom:1.5rem;background:rgba(255,255,255,0.15);border-radius:6px;"></div>
+
+        <div style="display:flex;gap:1.5rem;margin-bottom:2rem;">
+          <div class="skeleton" style="width:120px;height:18px;background:rgba(255,255,255,0.1);"></div>
+          <div class="skeleton" style="width:90px;height:18px;background:rgba(255,255,255,0.1);"></div>
+          <div class="skeleton" style="width:140px;height:18px;background:rgba(255,255,255,0.1);"></div>
+        </div>
+
+        <div class="skeleton" style="width:200px;height:48px;border-radius:6px;background:rgba(0,230,118,0.25);"></div>
+      </div>
+    </section>
+
+    <section class="section section-sm">
+      <div class="container">
+        <div class="job-detail-layout">
+          <div class="job-detail-body" style="display:flex;flex-direction:column;gap:1.25rem;">
+            <div class="skeleton" style="width:35%;height:28px;"></div>
+            <div class="skeleton" style="width:100%;height:16px;"></div>
+            <div class="skeleton" style="width:95%;height:16px;"></div>
+            <div class="skeleton" style="width:90%;height:16px;"></div>
+            <div class="skeleton" style="width:75%;height:16px;"></div>
+            <div class="skeleton" style="width:100%;height:16px;margin-top:1rem;"></div>
+            <div class="skeleton" style="width:85%;height:16px;"></div>
+            <div class="skeleton" style="width:60%;height:16px;"></div>
+          </div>
+
+          <aside class="job-detail-sidebar">
+            <div class="apply-card" style="display:flex;flex-direction:column;gap:1rem;">
+              <div class="skeleton" style="width:80px;height:14px;"></div>
+              <div class="skeleton" style="width:85%;height:24px;"></div>
+              <div class="skeleton" style="width:100%;height:14px;"></div>
+              <div class="skeleton" style="width:100%;height:44px;border-radius:6px;margin-top:0.5rem;"></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+  `
+}

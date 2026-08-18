@@ -8,7 +8,7 @@ import path from 'path'
  * Mapeamento canônico dos status do pipeline de seleção do OpenCATS
  */
 export const STATUS_MAP = {
-  0:   { label: 'Sem Status', color: 'gray' },
+  0: { label: 'Sem Status', color: 'gray' },
   100: { label: 'Novo / Recebido', color: 'blue' },
   200: { label: 'Contactado', color: 'teal' },
   250: { label: 'Candidato Respondeu', color: 'purple' },
@@ -26,12 +26,18 @@ export const STATUS_MAP = {
  * Helper padronizado para respostas de sucesso
  */
 export function sendSuccess(res, payload = {}, message = '', statusCode = 200) {
+  const reqId = res?.req?.id
   if (typeof payload === 'string') {
-    return res.status(statusCode).json({ success: true, message: payload })
+    return res.status(statusCode).json({
+      success: true,
+      message: payload,
+      ...(reqId ? { request_id: reqId } : {}),
+    })
   }
   return res.status(statusCode).json({
     success: true,
     ...(message ? { message } : {}),
+    ...(reqId ? { request_id: reqId } : {}),
     ...payload,
   })
 }
@@ -39,11 +45,18 @@ export function sendSuccess(res, payload = {}, message = '', statusCode = 200) {
 /**
  * Helper padronizado para respostas de erro
  */
-export function sendError(res, message = 'Ocorreu um erro ao processar a solicitação.', statusCode = 500, details = null) {
+export function sendError(
+  res,
+  message = 'Ocorreu um erro ao processar a solicitação.',
+  statusCode = 500,
+  details = null
+) {
+  const reqId = res?.req?.id
   const response = {
     success: false,
     error: message,
     message,
+    ...(reqId ? { request_id: reqId } : {}),
   }
   if (details && process.env.NODE_ENV !== 'production') {
     response.details = details
@@ -60,12 +73,13 @@ export function sendError(res, message = 'Ocorreu um erro ao processar a solicit
 export async function saveCandidateAttachment(dbOrConn, candidateId, file) {
   if (!file) return null
 
-  const mimeType     = file.mimetype || 'application/octet-stream'
-  const fileSizeKb   = Math.max(1, Math.round((file.size || 0) / 1024))
-  const storedName   = file.filename
+  const mimeType = file.mimetype || 'application/octet-stream'
+  const fileSizeKb = Math.max(1, Math.round((file.size || 0) / 1024))
+  const storedName = file.filename
   const originalName = file.originalname || file.filename
 
-  const [result] = await dbOrConn.execute(`
+  const [result] = await dbOrConn.execute(
+    `
     INSERT INTO attachment (
       data_item_type,
       data_item_id,
@@ -80,14 +94,9 @@ export async function saveCandidateAttachment(dbOrConn, candidateId, file) {
       date_created,
       date_modified
     ) VALUES (100, ?, ?, ?, ?, ?, 1, ?, '', '', NOW(), NOW())
-  `, [
-    candidateId,
-    `Currículo — ${originalName}`,
-    originalName,
-    storedName,
-    mimeType,
-    fileSizeKb,
-  ])
+  `,
+    [candidateId, `Currículo — ${originalName}`, originalName, storedName, mimeType, fileSizeKb]
+  )
 
   return result.insertId
 }
@@ -140,13 +149,15 @@ export function formatCandidateProfile(c, extras = {}, apps = [], attachments = 
     if (extras['Formacao Academica']) educations = JSON.parse(extras['Formacao Academica'])
   } catch {
     if (extras['Escolaridade'] || extras['Curso']) {
-      educations = [{
-        level: extras['Escolaridade'] || 'Superior Completo',
-        course: extras['Curso'] || '',
-        institution: extras['Instituicao de Ensino'] || '',
-        year: extras['Ano de Conclusao'] || '',
-        status: 'Concluído'
-      }]
+      educations = [
+        {
+          level: extras['Escolaridade'] || 'Superior Completo',
+          course: extras['Curso'] || '',
+          institution: extras['Instituicao de Ensino'] || '',
+          year: extras['Ano de Conclusao'] || '',
+          status: 'Concluído',
+        },
+      ]
     }
   }
 
@@ -155,12 +166,14 @@ export function formatCandidateProfile(c, extras = {}, apps = [], attachments = 
     if (extras['Historico Profissional']) experiences = JSON.parse(extras['Historico Profissional'])
   } catch {
     if (extras['Ultimo Cargo'] || c.current_employer) {
-      experiences = [{
-        role: extras['Ultimo Cargo'] || '',
-        company: c.current_employer || '',
-        period: extras['Tempo de Experiencia'] || '',
-        activities: ''
-      }]
+      experiences = [
+        {
+          role: extras['Ultimo Cargo'] || '',
+          company: c.current_employer || '',
+          period: extras['Tempo de Experiencia'] || '',
+          activities: '',
+        },
+      ]
     }
   }
 
@@ -184,11 +197,18 @@ export function formatCandidateProfile(c, extras = {}, apps = [], attachments = 
     can_relocate: Boolean(c.can_relocate),
     experience_years: extras['Tempo de Experiencia'] || '1 a 3 anos',
     notes: c.notes || '',
-    key_skills: c.key_skills ? c.key_skills.split(',').map(s => s.trim()).filter(Boolean) : [],
+    key_skills: c.key_skills
+      ? c.key_skills
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
     source: c.source,
     date_created: c.date_created,
     date_modified: c.date_modified,
-    educations: educations.length ? educations : [{ level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' }],
+    educations: educations.length
+      ? educations
+      : [{ level: 'Superior Completo', course: '', institution: '', year: '', status: 'Concluído' }],
     experiences: experiences.length ? experiences : [{ role: '', company: '', period: '', activities: '' }],
     extra_fields: extras,
     applications: apps,

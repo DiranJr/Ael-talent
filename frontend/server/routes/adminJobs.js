@@ -3,7 +3,7 @@
  */
 
 import { getDb } from '../db.js'
-import { sendSuccess, sendError } from '../helpers.js'
+import { sendError, sendSuccess } from '../helpers.js'
 
 /**
  * GET /api/admin/jobs
@@ -108,14 +108,15 @@ export async function adminCreateJobHandler(req, res) {
 
     const db = await getDb()
 
-    const finalStatus = is_public ? 'Active-Share' : (status || 'Active')
+    const finalStatus = is_public ? 'Active-Share' : status || 'Active'
     const finalPublic = is_public ? 1 : 0
     const finalOpenings = parseInt(openings) || 1
     const deptId = department_id ? parseInt(department_id) : null
-    const recruiterId = recruiter_id ? parseInt(recruiter_id, 10) : (req.adminUser?.user_id || 1)
+    const recruiterId = recruiter_id ? parseInt(recruiter_id, 10) : req.adminUser?.user_id || 1
     const userId = req.adminUser?.user_id || 1
 
-    const [result] = await db.execute(`
+    const [result] = await db.execute(
+      `
       INSERT INTO joborder (
         title,
         description,
@@ -139,26 +140,33 @@ export async function adminCreateJobHandler(req, res) {
       ) VALUES (
         ?, ?, ?, ?, ?, 1, ?, ?, ?, 'BR', 2, ?, ?, ?, ?, ?, ?, NOW(), NOW()
       )
-    `, [
-      title.trim(),
-      description?.trim() || '',
-      notes?.trim() || '',
-      type,
-      finalStatus,
-      finalPublic,
-      city?.trim() || '',
-      state?.trim() || '',
-      deptId,
-      recruiterId,
-      finalOpenings,
-      finalOpenings,
-      userId,
-      userId
-    ])
+    `,
+      [
+        title.trim(),
+        description?.trim() || '',
+        notes?.trim() || '',
+        type,
+        finalStatus,
+        finalPublic,
+        city?.trim() || '',
+        state?.trim() || '',
+        deptId,
+        recruiterId,
+        finalOpenings,
+        finalOpenings,
+        userId,
+        userId,
+      ]
+    )
 
-    return sendSuccess(res, {
-      joborder_id: result.insertId,
-    }, 'Vaga criada com sucesso!', 201)
+    return sendSuccess(
+      res,
+      {
+        joborder_id: result.insertId,
+      },
+      'Vaga criada com sucesso!',
+      201
+    )
   } catch (err) {
     console.error('[/api/admin/jobs:POST] Erro:', err.message)
     return sendError(res, 'Erro ao criar vaga.', 500)
@@ -196,7 +204,7 @@ export async function adminUpdateJobHandler(req, res) {
 
     const db = await getDb()
 
-    const finalStatus = is_public ? 'Active-Share' : (status || 'Active')
+    const finalStatus = is_public ? 'Active-Share' : status || 'Active'
     const finalPublic = is_public ? 1 : 0
     const finalOpenings = parseInt(openings) || 1
     const deptId = department_id ? parseInt(department_id) : null
@@ -213,7 +221,7 @@ export async function adminUpdateJobHandler(req, res) {
       'state = ?',
       'company_department_id = ?',
       'openings = ?',
-      'date_modified = NOW()'
+      'date_modified = NOW()',
     ]
 
     const updateParams = [
@@ -236,11 +244,14 @@ export async function adminUpdateJobHandler(req, res) {
 
     updateParams.push(id)
 
-    await db.execute(`
+    await db.execute(
+      `
       UPDATE joborder SET
         ${updateFields.join(', ')}
       WHERE joborder_id = ?
-    `, updateParams)
+    `,
+      updateParams
+    )
 
     return sendSuccess(res, {}, 'Vaga atualizada com sucesso!')
   } catch (err) {
@@ -280,15 +291,22 @@ export async function adminToggleJobStatusHandler(req, res) {
       return sendError(res, 'Ação inválida. Use: publish, pause, close, reopen.', 400)
     }
 
-    await db.execute(`
+    await db.execute(
+      `
       UPDATE joborder SET
         status = ?,
         public = ?,
         date_modified = NOW()
       WHERE joborder_id = ?
-    `, [newStatus, newPublic, id])
+    `,
+      [newStatus, newPublic, id]
+    )
 
-    return sendSuccess(res, { status: newStatus, public: newPublic }, `Vaga ${newStatus === 'Active-Share' ? 'publicada' : (newStatus === 'On Hold' ? 'pausada' : 'encerrada')} com sucesso!`)
+    return sendSuccess(
+      res,
+      { status: newStatus, public: newPublic },
+      `Vaga ${newStatus === 'Active-Share' ? 'publicada' : newStatus === 'On Hold' ? 'pausada' : 'encerrada'} com sucesso!`
+    )
   } catch (err) {
     console.error('[/api/admin/jobs/:id/status:PATCH] Erro:', err.message)
     return sendError(res, 'Erro ao alterar status da vaga.', 500)
@@ -303,7 +321,11 @@ export async function adminDeleteJobHandler(req, res) {
   const user = req.adminUser || {}
   const isAdmin = (user.access_level || 0) >= 400
   if (!isAdmin) {
-    return sendError(res, 'Apenas Administradores do RH podem excluir vagas permanentemente. Recrutadores podem apenas pausar ou encerrar a vaga.', 403)
+    return sendError(
+      res,
+      'Apenas Administradores do RH podem excluir vagas permanentemente. Recrutadores podem apenas pausar ou encerrar a vaga.',
+      403
+    )
   }
 
   let conn

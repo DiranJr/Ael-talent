@@ -6,15 +6,15 @@ import {
   adminGetCandidates,
   adminGetJobs,
   adminUpdateCandidateStatus,
-  getAttachmentDownloadUrl,
   getAdminUser,
+  getAttachmentDownloadUrl,
 } from '../../api.js'
-import { renderAdminLayout, bindAdminLayoutEvents } from '../../components/AdminLayout.js'
-import { navigate } from '../../router.js'
+import { bindAdminLayoutEvents, renderAdminLayout } from '../../components/AdminLayout.js'
 import { showToast } from '../../components/Toast.js'
+import { navigate } from '../../router.js'
 
 const STATUS_OPTIONS = [
-  { value: '',    label: 'Todos os Status' },
+  { value: '', label: 'Todos os Status' },
   { value: '100', label: 'Novo / Recebido' },
   { value: '200', label: 'Contactado' },
   { value: '300', label: 'Em Triagem' },
@@ -25,20 +25,24 @@ const STATUS_OPTIONS = [
 ]
 
 export async function renderAdminCandidates(params, appEl) {
-  let candidates = []
-  let jobs = []
   const currentUser = getAdminUser() || {}
-
   const urlParams = new URLSearchParams(window.location.hash.split('?')[1] || '')
   const selectedJobId = params?.joborder_id || urlParams.get('joborder_id') || ''
 
+  // Renderiza Skeleton imediato
+  appEl.innerHTML = renderAdminLayout(renderCandidatesSkeleton(), {
+    title: 'Triagem de Candidatos',
+    activeRoute: '/admin/candidates',
+  })
+  bindAdminLayoutEvents(appEl)
+
+  let candidates = []
+  let jobs = []
+
   try {
-    const [candRes, jobsRes] = await Promise.all([
-      adminGetCandidates({ joborder_id: selectedJobId }),
-      adminGetJobs(),
-    ])
+    const [candRes, jobsRes] = await Promise.all([adminGetCandidates({ joborder_id: selectedJobId }), adminGetJobs()])
     candidates = candRes.candidates || []
-    jobs       = jobsRes.jobs || []
+    jobs = jobsRes.jobs || []
   } catch (err) {
     if (err.message.includes('401')) {
       navigate('/admin/login')
@@ -64,18 +68,22 @@ export async function renderAdminCandidates(params, appEl) {
         <div style="width: 260px;">
           <select id="cand-filter-job" class="form-control">
             <option value="">Todas as Vagas (${jobs.length})</option>
-            ${jobs.map(j => `
+            ${jobs
+              .map(
+                (j) => `
               <option value="${j.joborder_id}" ${String(j.joborder_id) === selectedJobId ? 'selected' : ''}>
                 ${escHtml(j.title)} (${j.total_applicants || 0})
               </option>
-            `).join('')}
+            `
+              )
+              .join('')}
           </select>
         </div>
 
         <!-- Filtro por Status -->
         <div style="width: 200px;">
           <select id="cand-filter-status" class="form-control">
-            ${STATUS_OPTIONS.map(s => `<option value="${s.value}">${s.label}</option>`).join('')}
+            ${STATUS_OPTIONS.map((s) => `<option value="${s.value}">${s.label}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -118,6 +126,48 @@ export async function renderAdminCandidates(params, appEl) {
   bindCandidatesEvents(appEl, candidates, currentUser)
 }
 
+function renderCandidatesSkeleton() {
+  return `
+    <div class="data-card" style="margin-bottom: 1.5rem; padding: 1.25rem;" aria-hidden="true">
+      <div style="display: flex; gap: 1rem; align-items: center;">
+        <div class="skeleton" style="flex: 1; height: 38px; border-radius: 6px;"></div>
+        <div class="skeleton" style="width: 240px; height: 38px; border-radius: 6px;"></div>
+        <div class="skeleton" style="width: 180px; height: 38px; border-radius: 6px;"></div>
+      </div>
+    </div>
+
+    <div class="data-card" aria-hidden="true">
+      <div class="data-card-header">
+        <div class="skeleton" style="width: 180px; height: 18px;"></div>
+      </div>
+      <div style="padding: 1rem; display: flex; flex-direction: column; gap: 0.875rem;">
+        ${[1, 2, 3, 4, 5, 6]
+          .map(
+            () => `
+          <div style="display: grid; grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1.2fr 1fr; gap: 1rem; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid var(--ael-line);">
+            <div style="display:flex;flex-direction:column;gap:0.35rem;">
+              <div class="skeleton" style="width: 70%; height: 16px;"></div>
+              <div class="skeleton" style="width: 40%; height: 12px;"></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.35rem;">
+              <div class="skeleton" style="width: 80%; height: 14px;"></div>
+              <div class="skeleton" style="width: 50%; height: 12px;"></div>
+            </div>
+            <div class="skeleton" style="width: 75%; height: 14px;"></div>
+            <div class="skeleton" style="width: 60%; height: 14px;"></div>
+            <div class="skeleton" style="width: 90%; height: 30px; border-radius: 4px;"></div>
+            <div style="display:flex;justify-content:flex-end;">
+              <div class="skeleton" style="width: 80px; height: 28px; border-radius: 4px;"></div>
+            </div>
+          </div>
+        `
+          )
+          .join('')}
+      </div>
+    </div>
+  `
+}
+
 function renderCandidatesRows(candidates, currentUser) {
   if (!candidates.length) {
     return `
@@ -129,10 +179,11 @@ function renderCandidatesRows(candidates, currentUser) {
     `
   }
 
-  return candidates.map(c => {
-    const isMyJob = c.recruiter_id === currentUser?.user_id
-    const downloadUrl = c.attachment_id ? getAttachmentDownloadUrl(c.attachment_id) : null
-    return `
+  return candidates
+    .map((c) => {
+      const isMyJob = c.recruiter_id === currentUser?.user_id
+      const downloadUrl = c.attachment_id ? getAttachmentDownloadUrl(c.attachment_id) : null
+      return `
       <tr data-id="${c.candidate_id}" data-job-id="${c.joborder_id}">
         <!-- CANDIDATO -->
         <td>
@@ -147,11 +198,15 @@ function renderCandidatesRows(candidates, currentUser) {
           <div style="font-size: 0.8125rem; color: var(--ael-ink);">${escHtml(c.email || '—')}</div>
           <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 2px;">
             <span style="font-size: 0.75rem; color: var(--ael-muted);">${escHtml(c.phone || '—')}</span>
-            ${c.whatsapp_link ? `
+            ${
+              c.whatsapp_link
+                ? `
               <a href="${c.whatsapp_link}" target="_blank" rel="noreferrer" class="btn btn-sm btn-ghost" style="padding: 1px 6px; font-size: 0.6875rem; color: #25D366; font-weight: 700;" title="Abrir conversa no WhatsApp">
                 💬 WhatsApp
               </a>
-            ` : ''}
+            `
+                : ''
+            }
           </div>
         </td>
 
@@ -186,16 +241,21 @@ function renderCandidatesRows(candidates, currentUser) {
         <!-- AÇÕES -->
         <td style="text-align: right;">
           <div style="display: inline-flex; gap: 0.5rem; align-items: center;">
-            ${downloadUrl ? `
+            ${
+              downloadUrl
+                ? `
               <a href="${downloadUrl}" target="_blank" rel="noopener" class="admin-action-btn" title="Visualizar / Baixar Currículo">
                 📄 Currículo
               </a>
-            ` : '<span style="font-size: 0.75rem; color: var(--ael-muted);">Sem PDF</span>'}
+            `
+                : '<span style="font-size: 0.75rem; color: var(--ael-muted);">Sem PDF</span>'
+            }
           </div>
         </td>
       </tr>
     `
-  }).join('')
+    })
+    .join('')
 }
 
 function bindCandidatesEvents(appEl, candidates, currentUser) {
@@ -207,22 +267,23 @@ function bindCandidatesEvents(appEl, candidates, currentUser) {
     let filtered = candidates
 
     if (jobFilter) {
-      filtered = filtered.filter(c => String(c.joborder_id) === String(jobFilter))
+      filtered = filtered.filter((c) => String(c.joborder_id) === String(jobFilter))
     }
 
     if (statusFilter) {
-      filtered = filtered.filter(c => String(c.status_code) === String(statusFilter))
+      filtered = filtered.filter((c) => String(c.status_code) === String(statusFilter))
     }
 
     if (searchQ) {
       const q = searchQ.toLowerCase()
-      filtered = filtered.filter(c =>
-        (c.full_name || '').toLowerCase().includes(q) ||
-        (c.email || '').toLowerCase().includes(q) ||
-        (c.phone || '').toLowerCase().includes(q) ||
-        (c.city || '').toLowerCase().includes(q) ||
-        (c.job_title || '').toLowerCase().includes(q) ||
-        (c.recruiter_name || '').toLowerCase().includes(q)
+      filtered = filtered.filter(
+        (c) =>
+          (c.full_name || '').toLowerCase().includes(q) ||
+          (c.email || '').toLowerCase().includes(q) ||
+          (c.phone || '').toLowerCase().includes(q) ||
+          (c.city || '').toLowerCase().includes(q) ||
+          (c.job_title || '').toLowerCase().includes(q) ||
+          (c.recruiter_name || '').toLowerCase().includes(q)
       )
     }
 
@@ -252,7 +313,7 @@ function bindCandidatesEvents(appEl, candidates, currentUser) {
 }
 
 function bindStatusSelects(appEl) {
-  appEl.querySelectorAll('.status-select').forEach(select => {
+  appEl.querySelectorAll('.status-select').forEach((select) => {
     select.addEventListener('change', async (e) => {
       const candidateId = select.dataset.candidateId
       const jobId = select.dataset.jobId
@@ -265,29 +326,47 @@ function bindStatusSelects(appEl) {
         return
       }
 
+      select.disabled = true
+
       try {
         await adminUpdateCandidateStatus(candidateId, jobId, {
           status: newStatus,
-          note: note ? note.trim() : ''
+          note: note ? note.trim() : '',
         })
         select.dataset.currentStatus = newStatus
-        showToast({ title: 'Status atualizado!', message: 'A etapa do candidato foi registrada com sua autoria.', type: 'success' })
+        showToast({
+          title: 'Status atualizado!',
+          message: 'A etapa do candidato foi registrada com sua autoria.',
+          type: 'success',
+        })
       } catch (err) {
         select.value = prevStatus
         showToast({ title: 'Erro ao atualizar', message: err.message, type: 'error' })
+      } finally {
+        select.disabled = false
       }
     })
   })
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function formatDate(d) {
   if (!d) return '—'
   try {
-    return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    return new Date(d).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
   } catch {
     return String(d)
   }

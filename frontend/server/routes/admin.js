@@ -2,11 +2,11 @@
  * A&L Talent Admin — Rotas Gerais (Auth, Dashboard Stats, Departamentos)
  */
 
-import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
-import { getDb } from '../db.js'
+import crypto from 'crypto'
 import { signAdminToken, verifyAdminToken } from '../auth/tokens.js'
-import { sendSuccess, sendError } from '../helpers.js'
+import { getDb } from '../db.js'
+import { sendError, sendSuccess } from '../helpers.js'
 
 /**
  * Middleware de Autenticação para Rotas Administrativas (RH)
@@ -85,22 +85,26 @@ export async function adminLoginHandler(req, res) {
       access_level: user.access_level,
     })
 
-    return sendSuccess(res, {
-      token,
-      user: {
-        id: user.user_id,
-        user_id: user.user_id,
-        username: user.user_name,
-        name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.user_name,
-        first_name: user.first_name,
-        last_name: user.last_name,
-        email: user.email || '',
-        access_level: user.access_level,
-        accessLevel: user.access_level,
-        role: user.access_level >= 400 ? 'Administrador' : 'Recrutador',
-        is_admin: user.access_level >= 400,
+    return sendSuccess(
+      res,
+      {
+        token,
+        user: {
+          id: user.user_id,
+          user_id: user.user_id,
+          username: user.user_name,
+          name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.user_name,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          email: user.email || '',
+          access_level: user.access_level,
+          accessLevel: user.access_level,
+          role: user.access_level >= 400 ? 'Administrador' : 'Recrutador',
+          is_admin: user.access_level >= 400,
+        },
       },
-    }, 'Login realizado com sucesso!')
+      'Login realizado com sucesso!'
+    )
   } catch (err) {
     console.error('[/api/admin/login] Erro:', err.message)
     return sendError(res, 'Erro no servidor de autenticação.', 500)
@@ -130,18 +134,24 @@ export async function adminStatsHandler(req, res) {
     }
 
     // 1. Total de vagas ativas/publicadas
-    const [[{ total_active_jobs }]] = await db.execute(`
+    const [[{ total_active_jobs }]] = await db.execute(
+      `
       SELECT COUNT(*) AS total_active_jobs
       FROM joborder jo
       WHERE (jo.status = 'Active-Share' OR jo.public = 1) ${jobScopeWhere}
-    `, jobParams)
+    `,
+      jobParams
+    )
 
     // 2. Total geral de vagas
-    const [[{ total_jobs }]] = await db.execute(`
+    const [[{ total_jobs }]] = await db.execute(
+      `
       SELECT COUNT(*) AS total_jobs
       FROM joborder jo
       WHERE 1=1 ${jobScopeWhere}
-    `, jobParams)
+    `,
+      jobParams
+    )
 
     // 3. Total de candidatos cadastrados
     const [[{ total_candidates }]] = await db.execute(`
@@ -149,15 +159,19 @@ export async function adminStatsHandler(req, res) {
     `)
 
     // 4. Candidaturas nos últimos 7 dias
-    const [[{ recent_applications }]] = await db.execute(`
+    const [[{ recent_applications }]] = await db.execute(
+      `
       SELECT COUNT(*) AS recent_applications
       FROM candidate_joborder cj
       JOIN joborder jo ON cj.joborder_id = jo.joborder_id
       WHERE cj.date_created >= DATE_SUB(NOW(), INTERVAL 7 DAY) ${appScopeWhere}
-    `, appParams)
+    `,
+      appParams
+    )
 
     // 5. Últimas 6 candidaturas recebidas
-    const [latestApplications] = await db.execute(`
+    const [latestApplications] = await db.execute(
+      `
       SELECT
         cj.candidate_joborder_id,
         cj.candidate_id,
@@ -180,10 +194,13 @@ export async function adminStatsHandler(req, res) {
       WHERE 1=1 ${appScopeWhere}
       ORDER BY cj.date_created DESC
       LIMIT 6
-    `, appParams)
+    `,
+      appParams
+    )
 
     // 6. Vagas com mais candidaturas
-    const [topJobs] = await db.execute(`
+    const [topJobs] = await db.execute(
+      `
       SELECT
         jo.joborder_id,
         jo.title,
@@ -199,7 +216,9 @@ export async function adminStatsHandler(req, res) {
       GROUP BY jo.joborder_id
       ORDER BY total_applicants DESC, jo.date_created DESC
       LIMIT 5
-    `, jobParams)
+    `,
+      jobParams
+    )
 
     return res.json({
       metrics: {
@@ -257,26 +276,33 @@ export async function adminCreateDepartmentHandler(req, res) {
     const db = await getDb()
 
     // Verifica se já existe
-    const [existing] = await db.execute(
-      `SELECT company_department_id FROM company_department WHERE name = ? LIMIT 1`,
-      [name.trim()]
-    )
+    const [existing] = await db.execute(`SELECT company_department_id FROM company_department WHERE name = ? LIMIT 1`, [
+      name.trim(),
+    ])
 
     if (existing.length > 0) {
       return sendError(res, 'Este departamento já está cadastrado.', 409)
     }
 
-    const [result] = await db.execute(`
+    const [result] = await db.execute(
+      `
       INSERT INTO company_department (name, company_id, date_created, created_by)
       VALUES (?, 2, NOW(), 1)
-    `, [name.trim()])
+    `,
+      [name.trim()]
+    )
 
-    return sendSuccess(res, {
-      department: {
-        company_department_id: result.insertId,
-        name: name.trim(),
+    return sendSuccess(
+      res,
+      {
+        department: {
+          company_department_id: result.insertId,
+          name: name.trim(),
+        },
       },
-    }, 'Departamento criado com sucesso!', 201)
+      'Departamento criado com sucesso!',
+      201
+    )
   } catch (err) {
     console.error('[/api/admin/departments] Erro:', err.message)
     return sendError(res, 'Erro ao criar departamento.', 500)

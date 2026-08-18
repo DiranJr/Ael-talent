@@ -5,36 +5,22 @@
  */
 
 import express from 'express'
+import { candidateAuth } from '../auth/candidateAuth.js'
+import { dummyPasswordVerify, hashPassword, validatePasswordPolicy, verifyPassword } from '../auth/password.js'
+import { authLimiter, passwordResetLimiter, registrationLimiter } from '../auth/rateLimit.js'
+import { generateResetToken, hashResetToken, signCandidateToken, verifyCandidateToken } from '../auth/tokens.js'
 import { getDb } from '../db.js'
+import {
+  formatCandidateProfile,
+  formatWhatsAppUrl,
+  getCandidateExtraFields,
+  STATUS_MAP,
+  saveCandidateAttachment,
+  sendError,
+  sendSuccess,
+} from '../helpers.js'
 import { upload, validateUploadedFile } from '../upload.js'
 import { adminAuth } from './admin.js'
-import {
-  hashPassword,
-  verifyPassword,
-  dummyPasswordVerify,
-  validatePasswordPolicy,
-} from '../auth/password.js'
-import {
-  signCandidateToken,
-  verifyCandidateToken,
-  generateResetToken,
-  hashResetToken,
-} from '../auth/tokens.js'
-import {
-  authLimiter,
-  passwordResetLimiter,
-  registrationLimiter,
-} from '../auth/rateLimit.js'
-import { candidateAuth } from '../auth/candidateAuth.js'
-import {
-  saveCandidateAttachment,
-  getCandidateExtraFields,
-  formatCandidateProfile,
-  sendSuccess,
-  sendError,
-  formatWhatsAppUrl,
-  STATUS_MAP,
-} from '../helpers.js'
 
 const router = express.Router()
 
@@ -139,7 +125,7 @@ router.post('/login', authLimiter, async (req, res) => {
     if (!authRows.length || !authRows[0].password_hash) {
       return res.json({
         first_access: true,
-        message: 'Primeiro acesso detectado. Solicite a ativação da sua conta.'
+        message: 'Primeiro acesso detectado. Solicite a ativação da sua conta.',
       })
     }
 
@@ -148,7 +134,11 @@ router.post('/login', authLimiter, async (req, res) => {
     // Verificação de bloqueio por tentativas consecutivas (Lockout de 15 minutos)
     if (auth.locked_until && new Date(auth.locked_until) > new Date()) {
       const remainingMin = Math.ceil((new Date(auth.locked_until).getTime() - Date.now()) / (60 * 1000))
-      return sendError(res, `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${remainingMin} minuto(s).`, 423)
+      return sendError(
+        res,
+        `Conta temporariamente bloqueada por excesso de tentativas. Tente novamente em ${remainingMin} minuto(s).`,
+        423
+      )
     }
 
     if (!password?.trim()) {
@@ -167,10 +157,7 @@ router.post('/login', authLimiter, async (req, res) => {
         lockSql += ', locked_until = DATE_ADD(NOW(), INTERVAL 15 MINUTE)'
       }
 
-      await db.query(
-        `UPDATE candidate_auth SET ${lockSql} WHERE candidate_id = ?`,
-        [...lockParams, c.candidate_id]
-      )
+      await db.query(`UPDATE candidate_auth SET ${lockSql} WHERE candidate_id = ?`, [...lockParams, c.candidate_id])
 
       return sendError(res, 'E-mail ou senha inválidos.', 401)
     }
@@ -188,15 +175,19 @@ router.post('/login', authLimiter, async (req, res) => {
     const token = signCandidateToken({
       candidate_id: c.candidate_id,
       email: c.email1,
-      name: `${c.first_name} ${c.last_name}`.trim()
+      name: `${c.first_name} ${c.last_name}`.trim(),
     })
 
     const candidate = await getFormattedCandidate(db, c.candidate_id)
 
-    return sendSuccess(res, {
-      token,
-      candidate,
-    }, `Bem-vindo(a), ${c.first_name}!`)
+    return sendSuccess(
+      res,
+      {
+        token,
+        candidate,
+      },
+      `Bem-vindo(a), ${c.first_name}!`
+    )
   } catch (err) {
     console.error('Erro no login do candidato:', err)
     return sendError(res, 'Erro ao autenticar.', 500)
@@ -231,10 +222,9 @@ router.post('/set-password', authLimiter, async (req, res) => {
     }
 
     const c = candRows[0]
-    const [authRows] = await db.query(
-      'SELECT id, password_hash FROM candidate_auth WHERE candidate_id = ? LIMIT 1',
-      [c.candidate_id]
-    )
+    const [authRows] = await db.query('SELECT id, password_hash FROM candidate_auth WHERE candidate_id = ? LIMIT 1', [
+      c.candidate_id,
+    ])
 
     const authHeader = req.headers.authorization
     let isAuthorized = false
@@ -285,15 +275,19 @@ router.post('/set-password', authLimiter, async (req, res) => {
     const token = signCandidateToken({
       candidate_id: c.candidate_id,
       email: c.email1,
-      name: `${c.first_name} ${c.last_name}`.trim()
+      name: `${c.first_name} ${c.last_name}`.trim(),
     })
 
     const candidate = await getFormattedCandidate(db, c.candidate_id)
 
-    return sendSuccess(res, {
-      token,
-      candidate,
-    }, 'Senha cadastrada com sucesso!')
+    return sendSuccess(
+      res,
+      {
+        token,
+        candidate,
+      },
+      'Senha cadastrada com sucesso!'
+    )
   } catch (err) {
     console.error('Erro ao definir senha:', err)
     return sendError(res, 'Erro ao salvar senha.', 500)
@@ -322,10 +316,9 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
       const c = candRows[0]
       const { token, tokenHash, expiresAt } = generateResetToken()
 
-      const [authRows] = await db.query(
-        'SELECT id FROM candidate_auth WHERE candidate_id = ? LIMIT 1',
-        [c.candidate_id]
-      )
+      const [authRows] = await db.query('SELECT id FROM candidate_auth WHERE candidate_id = ? LIMIT 1', [
+        c.candidate_id,
+      ])
 
       if (authRows.length > 0) {
         await db.query(
@@ -353,7 +346,7 @@ router.post('/forgot-password', passwordResetLimiter, async (req, res) => {
     }
 
     const responsePayload = {
-      message: 'Se o e-mail informado estiver cadastrado em nossa base, você receberá as instruções de recuperação.'
+      message: 'Se o e-mail informado estiver cadastrado em nossa base, você receberá as instruções de recuperação.',
     }
 
     if (res.locals?.devResetToken) {
@@ -474,9 +467,7 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
     let educationsList = []
     if (req.body.educations) {
       try {
-        const raw = typeof req.body.educations === 'string'
-          ? JSON.parse(req.body.educations)
-          : req.body.educations
+        const raw = typeof req.body.educations === 'string' ? JSON.parse(req.body.educations) : req.body.educations
         if (Array.isArray(raw)) {
           educationsList = raw.slice(0, 20)
         }
@@ -488,9 +479,7 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
     let experiencesList = []
     if (req.body.experiences) {
       try {
-        const raw = typeof req.body.experiences === 'string'
-          ? JSON.parse(req.body.experiences)
-          : req.body.experiences
+        const raw = typeof req.body.experiences === 'string' ? JSON.parse(req.body.experiences) : req.body.experiences
         if (Array.isArray(raw)) {
           experiencesList = raw.slice(0, 20)
         }
@@ -513,7 +502,7 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
 
     const cleanPhone = phone.trim()
     const cleanFirst = first_name.trim()
-    const cleanLast  = last_name.trim()
+    const cleanLast = last_name.trim()
 
     // 1. DEDUPLICAÇÃO NATIVA
     const [existing] = await conn.query(
@@ -555,8 +544,8 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
           desired_pay?.trim() || '',
           can_relocate === '1' || can_relocate === true || can_relocate === 'true' ? 1 : 0,
           notes?.trim() || '',
-          Array.isArray(key_skills) ? key_skills.join(', ') : (key_skills?.trim() || ''),
-          candidateId
+          Array.isArray(key_skills) ? key_skills.join(', ') : key_skills?.trim() || '',
+          candidateId,
         ]
       )
     } else {
@@ -580,7 +569,7 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
           desired_pay?.trim() || null,
           can_relocate === '1' || can_relocate === true || can_relocate === 'true' ? 1 : 0,
           notes?.trim() || null,
-          Array.isArray(key_skills) ? key_skills.join(', ') : (key_skills?.trim() || null)
+          Array.isArray(key_skills) ? key_skills.join(', ') : key_skills?.trim() || null,
         ]
       )
       candidateId = insertRes.insertId
@@ -592,9 +581,9 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
       'Area de Interesse': interest_area?.trim() || null,
       'Cargo Desejado': desired_role?.trim() || null,
       'Disponibilidade para Viagens': travel_availability?.trim() || null,
-      'CNH': driver_license?.trim() || null,
-      'Escolaridade': primaryEducation.level || req.body.education_level || null,
-      'Curso': primaryEducation.course || req.body.course || null,
+      CNH: driver_license?.trim() || null,
+      Escolaridade: primaryEducation.level || req.body.education_level || null,
+      Curso: primaryEducation.course || req.body.course || null,
       'Instituicao de Ensino': primaryEducation.institution || req.body.institution || null,
       'Ano de Conclusao': primaryEducation.year || req.body.graduation_year || null,
       'Tempo de Experiencia': experience_years?.trim() || null,
@@ -603,15 +592,15 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
       'Historico Profissional': experiencesList.length ? JSON.stringify(experiencesList) : null,
       'Consentimento LGPD': consent_lgpd
         ? `Autorizado em ${new Date().toLocaleString('pt-BR')} (IP: ${req.ip || '127.0.0.1'})`
-        : null
+        : null,
     }
 
     for (const [fieldName, val] of Object.entries(extraFieldsMap)) {
       if (val !== null && val !== undefined && val !== '') {
-        await conn.query(
-          'DELETE FROM extra_field WHERE data_item_id = ? AND data_item_type = 100 AND field_name = ?',
-          [candidateId, fieldName]
-        )
+        await conn.query('DELETE FROM extra_field WHERE data_item_id = ? AND data_item_type = 100 AND field_name = ?', [
+          candidateId,
+          fieldName,
+        ])
         await conn.query(
           'INSERT INTO extra_field (data_item_id, field_name, value, import_id, data_item_type) VALUES (?, ?, ?, 0, 100)',
           [candidateId, fieldName, String(val)]
@@ -684,9 +673,9 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
     // 6. REGISTRO DE ATIVIDADE
     const activityNote = appliedJobTitle
       ? `Candidatura enviada para a vaga "${appliedJobTitle}" e perfil registrado no Banco de Talentos.`
-      : (isNew
-          ? `Cadastro realizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`
-          : `Perfil atualizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`)
+      : isNew
+        ? `Cadastro realizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`
+        : `Perfil atualizado no Banco de Talentos A&L (Área: ${interest_area || 'Geral'})`
 
     await conn.query(
       `INSERT INTO activity (
@@ -700,21 +689,25 @@ router.post('/register', registrationLimiter, upload.single('resume'), async (re
     const token = signCandidateToken({
       candidate_id: candidateId,
       email: cleanEmail,
-      name: `${cleanFirst} ${cleanLast}`
+      name: `${cleanFirst} ${cleanLast}`,
     })
 
-    return sendSuccess(res, {
-      isNew,
-      token,
-      candidate_id: candidateId,
-      attachment_id: attachmentId,
-      job_title: appliedJobTitle,
-    }, appliedJobTitle
-      ? `Candidatura para a vaga "${appliedJobTitle}" realizada com sucesso!`
-      : (isNew
+    return sendSuccess(
+      res,
+      {
+        isNew,
+        token,
+        candidate_id: candidateId,
+        attachment_id: attachmentId,
+        job_title: appliedJobTitle,
+      },
+      appliedJobTitle
+        ? `Candidatura para a vaga "${appliedJobTitle}" realizada com sucesso!`
+        : isNew
           ? 'Cadastro realizado com sucesso no Banco de Talentos da A&L Engenharia!'
-          : 'Perfil atualizado com sucesso no Banco de Talentos!'), 200)
-
+          : 'Perfil atualizado com sucesso no Banco de Talentos!',
+      200
+    )
   } catch (err) {
     await conn.rollback()
     console.error('Erro no cadastro do Banco de Talentos:', err)
@@ -855,8 +848,8 @@ router.get('/candidates', adminAuth, async (req, res) => {
 
     const [candidates] = await db.query(selectSql, [...params, limit, offset])
 
-    const candidateIds = candidates.map(c => c.candidate_id)
-    let extraFieldsByCand = {}
+    const candidateIds = candidates.map((c) => c.candidate_id)
+    const extraFieldsByCand = {}
 
     if (candidateIds.length > 0) {
       const [extraRows] = await db.query(
@@ -876,7 +869,7 @@ router.get('/candidates', adminAuth, async (req, res) => {
       }
     }
 
-    const formatted = candidates.map(c => {
+    const formatted = candidates.map((c) => {
       const extras = extraFieldsByCand[c.candidate_id] || {}
 
       let educations = []
@@ -904,7 +897,12 @@ router.get('/candidates', adminAuth, async (req, res) => {
         desired_pay: c.desired_pay,
         can_relocate: Boolean(c.can_relocate),
         notes: c.notes,
-        key_skills: c.key_skills ? c.key_skills.split(',').map(s => s.trim()).filter(Boolean) : [],
+        key_skills: c.key_skills
+          ? c.key_skills
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
         source: c.source,
         date_created: c.date_created,
         attachment_id: c.attachment_id,
@@ -1004,9 +1002,14 @@ router.post('/candidates/:id/assign-job', adminAuth, async (req, res) => {
         [candidateId, `Etapa do candidato atualizada para status ${initialStatus} na vaga "${jobTitle}".`]
       )
 
-      return sendSuccess(res, {
-        candidate_joborder_id: existing.candidate_joborder_id,
-      }, `Candidato atualizado com sucesso na vaga "${jobTitle}"!`, 200)
+      return sendSuccess(
+        res,
+        {
+          candidate_joborder_id: existing.candidate_joborder_id,
+        },
+        `Candidato atualizado com sucesso na vaga "${jobTitle}"!`,
+        200
+      )
     }
 
     const [insRes] = await db.query(
@@ -1030,9 +1033,14 @@ router.post('/candidates/:id/assign-job', adminAuth, async (req, res) => {
       [candidateId, `Candidato adicionado à vaga "${jobTitle}" a partir do Banco de Talentos.`]
     )
 
-    return sendSuccess(res, {
-      candidate_joborder_id: insRes.insertId,
-    }, `Candidato vinculado com sucesso à vaga "${jobTitle}"!`, 201)
+    return sendSuccess(
+      res,
+      {
+        candidate_joborder_id: insRes.insertId,
+      },
+      `Candidato vinculado com sucesso à vaga "${jobTitle}"!`,
+      201
+    )
   } catch (err) {
     console.error('Erro ao vincular vaga:', err)
     return sendError(res, 'Erro ao vincular candidato à vaga.', 500)

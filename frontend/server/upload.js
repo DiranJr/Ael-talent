@@ -3,10 +3,10 @@
  * Salva currículos na pasta de upload compartilhada com o OpenCATS
  */
 
+import crypto from 'crypto'
+import fs from 'fs'
 import multer, { diskStorage } from 'multer'
 import path from 'path'
-import fs from 'fs'
-import crypto from 'crypto'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -100,8 +100,8 @@ export async function validateUploadedFile(filePath, originalName = '') {
 
     // 1. PDF: Deve começar com %PDF- (0x25 0x50 0x44 0x46)
     if (ext === '.pdf') {
-      const isPdf = buffer.length >= 4 &&
-        buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46
+      const isPdf =
+        buffer.length >= 4 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46
       if (!isPdf) {
         await fs.promises.unlink(filePath).catch(() => {})
         return { valid: false, error: 'Assinatura binária de PDF inválida ou arquivo corrompido.' }
@@ -111,8 +111,8 @@ export async function validateUploadedFile(filePath, originalName = '') {
 
     // 2. DOCX: Assinatura ZIP PK (0x50 0x4B 0x03 0x04) + estrutura OpenXML
     if (ext === '.docx') {
-      const isZip = buffer.length >= 4 &&
-        buffer[0] === 0x50 && buffer[1] === 0x4B && buffer[2] === 0x03 && buffer[3] === 0x04
+      const isZip =
+        buffer.length >= 4 && buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04
       if (!isZip) {
         await fs.promises.unlink(filePath).catch(() => {})
         return { valid: false, error: 'Assinatura de arquivo DOCX inválida (não é um pacote ZIP/OpenXML válido).' }
@@ -131,9 +131,16 @@ export async function validateUploadedFile(filePath, originalName = '') {
 
     // 3. DOC Legado (Word 97-2003): Assinatura OLE Compound Document (0xD0 0xCF 0x11 0xE0 0xA1 0xB1 0x1A 0xE1)
     if (ext === '.doc') {
-      const isOleDoc = buffer.length >= 8 &&
-        buffer[0] === 0xD0 && buffer[1] === 0xCF && buffer[2] === 0x11 && buffer[3] === 0xE0 &&
-        buffer[4] === 0xA1 && buffer[5] === 0xB1 && buffer[6] === 0x1A && buffer[7] === 0xE1
+      const isOleDoc =
+        buffer.length >= 8 &&
+        buffer[0] === 0xd0 &&
+        buffer[1] === 0xcf &&
+        buffer[2] === 0x11 &&
+        buffer[3] === 0xe0 &&
+        buffer[4] === 0xa1 &&
+        buffer[5] === 0xb1 &&
+        buffer[6] === 0x1a &&
+        buffer[7] === 0xe1
       if (!isOleDoc) {
         await fs.promises.unlink(filePath).catch(() => {})
         return { valid: false, error: 'Assinatura de documento DOC legado inválida.' }
@@ -145,7 +152,9 @@ export async function validateUploadedFile(filePath, originalName = '') {
     return { valid: false, error: 'Extensão de arquivo não permitida.' }
   } catch (err) {
     if (fd) {
-      try { await fd.close() } catch (_) {}
+      try {
+        await fd.close()
+      } catch (_) {}
     }
     await fs.promises.unlink(filePath).catch(() => {})
     return { valid: false, error: `Erro na validação do arquivo: ${err.message}` }

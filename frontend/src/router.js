@@ -1,12 +1,14 @@
 /**
- * A&L Talent — Router SPA (hash-based) com suporte a Query String (?param=val)
+ * A&L Talent — Router SPA (hash-based) com suporte a Code Splitting, Lazy Loading & Query Strings
  */
 
 const routes = {}
+const moduleCache = new Map()
 let currentCleanup = null
+let progressBarEl = null
 
-export function route(path, handler) {
-  routes[path] = handler
+export function route(path, handlerOrLoader) {
+  routes[path] = handlerOrLoader
 }
 
 export function navigate(path) {
@@ -41,13 +43,13 @@ function matchRoute(fullPath) {
 
   // Exact match no pathname puro
   if (routes[pathname]) {
-    return { handler: routes[pathname], params: { ...queryParams } }
+    return { handlerOrLoader: routes[pathname], params: { ...queryParams } }
   }
 
   // Param match: /jobs/:id
   for (const pattern of Object.keys(routes)) {
     const patternParts = pattern.split('/')
-    const pathParts    = pathname.split('/')
+    const pathParts = pathname.split('/')
 
     if (patternParts.length !== pathParts.length) continue
 
@@ -63,10 +65,30 @@ function matchRoute(fullPath) {
       }
     }
 
-    if (matched) return { handler: routes[pattern], params }
+    if (matched) return { handlerOrLoader: routes[pattern], params }
   }
 
   return null
+}
+
+function ensureProgressBar() {
+  if (!progressBarEl) {
+    progressBarEl = document.createElement('div')
+    progressBarEl.className = 'route-progress-bar'
+    progressBarEl.setAttribute('aria-hidden', 'true')
+    document.body.appendChild(progressBarEl)
+  }
+}
+
+function showProgressBar() {
+  ensureProgressBar()
+  progressBarEl.classList.add('is-active')
+}
+
+function hideProgressBar() {
+  if (progressBarEl) {
+    progressBarEl.classList.remove('is-active')
+  }
 }
 
 export function initRouter(appEl) {
@@ -84,14 +106,42 @@ export function initRouter(appEl) {
       return
     }
 
-    // Scroll ao topo instantâneo
+    // Scroll ao topo suave
     window.scrollTo({ top: 0, behavior: 'instant' })
 
-    // Show loading
-    appEl.innerHTML = `<div class="page-loader"><div class="spinner"></div></div>`
+    // Se o handler for uma função que carrega módulo dinamicamente, resolve com timeout para feedback
+    let handler = matched.handlerOrLoader
+    let isLoader = false
+
+    if (typeof handler === 'function') {
+      // Verifica se é loader assíncrono (dynamic import)
+      // Se já estiver em cache, usa diretamente
+      const cached = moduleCache.get(matched.handlerOrLoader)
+      if (cached) {
+        handler = cached
+      } else {
+        // Tenta resolver caso seja função de dynamic import () => import(...)
+        const candidate = handler()
+        if (candidate && typeof candidate.then === 'function') {
+          isLoader = true
+          const timeoutId = setTimeout(() => {
+            showProgressBar()
+          }, 150) // Só exibe barra de progresso se demorar mais de 150ms
+
+          try {
+            const resolved = await candidate
+            handler = typeof resolved === 'function' ? resolved : resolved.default || resolved
+            moduleCache.set(matched.handlerOrLoader, handler)
+          } finally {
+            clearTimeout(timeoutId)
+            hideProgressBar()
+          }
+        }
+      }
+    }
 
     try {
-      const result = await matched.handler(matched.params, appEl)
+      const result = await handler(matched.params, appEl)
       if (typeof result === 'function') currentCleanup = result
     } catch (err) {
       console.error('Route error:', err)
@@ -136,7 +186,11 @@ function errorPage(message) {
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 function iconSvg(name) {

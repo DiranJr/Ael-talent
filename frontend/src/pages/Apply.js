@@ -3,8 +3,8 @@
  */
 
 import { getJob, submitApplication } from '../api.js'
-import { navigate } from '../router.js'
 import { showToast } from '../components/Toast.js'
+import { navigate } from '../router.js'
 
 export async function renderApply({ id }, appEl) {
   // Carrega dados da vaga para contexto
@@ -227,22 +227,28 @@ export async function renderApply({ id }, appEl) {
   `
 
   // ─── Upload handling ────────────────────────────────────────
-  const uploadArea   = document.getElementById('upload-area')
-  const fileInput    = document.getElementById('apply-resume')
-  const uploadLink   = document.getElementById('upload-link-btn')
-  const previewEl    = document.getElementById('upload-preview')
-  const resumeError  = document.getElementById('resume-error')
+  const uploadArea = document.getElementById('upload-area')
+  const fileInput = document.getElementById('apply-resume')
+  const uploadLink = document.getElementById('upload-link-btn')
+  const previewEl = document.getElementById('upload-preview')
+  const resumeError = document.getElementById('resume-error')
 
   uploadLink?.addEventListener('click', () => fileInput.click())
   uploadArea?.addEventListener('click', (e) => {
     if (e.target !== uploadLink) fileInput.click()
   })
   uploadArea?.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click() }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      fileInput.click()
+    }
   })
 
   // Drag & drop
-  uploadArea?.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over') })
+  uploadArea?.addEventListener('dragover', (e) => {
+    e.preventDefault()
+    uploadArea.classList.add('drag-over')
+  })
   uploadArea?.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'))
   uploadArea?.addEventListener('drop', (e) => {
     e.preventDefault()
@@ -257,11 +263,14 @@ export async function renderApply({ id }, appEl) {
 
   function handleFile(file) {
     resumeError.style.display = 'none'
-    const allowed = ['application/pdf', 'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+    const allowed = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]
     const ext = file.name.split('.').pop().toLowerCase()
 
-    if (!allowed.includes(file.type) && !['pdf','doc','docx'].includes(ext)) {
+    if (!allowed.includes(file.type) && !['pdf', 'doc', 'docx'].includes(ext)) {
       resumeError.textContent = 'Formato não permitido. Use PDF, DOC ou DOCX.'
       resumeError.style.display = 'block'
       return
@@ -305,68 +314,71 @@ export async function renderApply({ id }, appEl) {
     })
   }
 
-    // Máscara dinâmica de telefone
-    const phoneInput = document.getElementById('apply-phone')
-    phoneInput?.addEventListener('input', (e) => {
-      let v = e.target.value.replace(/\D/g, '')
-      if (v.length > 11) v = v.slice(0, 11)
-      if (v.length > 10) {
-        e.target.value = v.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3')
-      } else if (v.length > 6) {
-        e.target.value = v.replace(/^(\d{2})(\d{4})(\d{0,4})$/, '($1) $2-$3')
-      } else if (v.length > 2) {
-        e.target.value = v.replace(/^(\d{2})(\d{0,5})$/, '($1) $2')
-      } else {
-        e.target.value = v
-      }
-    })
+  // Máscara dinâmica de telefone
+  const phoneInput = document.getElementById('apply-phone')
+  phoneInput?.addEventListener('input', (e) => {
+    let v = e.target.value.replace(/\D/g, '')
+    if (v.length > 11) v = v.slice(0, 11)
+    if (v.length > 10) {
+      e.target.value = v.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3')
+    } else if (v.length > 6) {
+      e.target.value = v.replace(/^(\d{2})(\d{4})(\d{0,4})$/, '($1) $2-$3')
+    } else if (v.length > 2) {
+      e.target.value = v.replace(/^(\d{2})(\d{0,5})$/, '($1) $2')
+    } else {
+      e.target.value = v
+    }
+  })
 
-    // ─── Submit ─────────────────────────────────────────────────
-    const form      = document.getElementById('apply-form')
-    const submitBtn = document.getElementById('submit-btn')
-    const submitTxt = document.getElementById('submit-text')
+  // ─── Submit ─────────────────────────────────────────────────
+  const form = document.getElementById('apply-form')
+  const submitBtn = document.getElementById('submit-btn')
+  const submitTxt = document.getElementById('submit-text')
 
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault()
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault()
 
-      // Validação básica
-      const name  = document.getElementById('apply-name').value.trim()
-      const email = document.getElementById('apply-email').value.trim()
-      const phone = document.getElementById('apply-phone').value.trim()
-      const file  = fileInput.files[0]
+    // Validação básica
+    const name = document.getElementById('apply-name').value.trim()
+    const email = document.getElementById('apply-email').value.trim()
+    const phone = document.getElementById('apply-phone').value.trim()
+    const file = fileInput.files[0]
 
-      if (!name || !email || !phone || !file) {
-        showToast({ title: 'Campos obrigatórios', message: 'Preencha nome, e-mail, telefone e currículo.', type: 'error' })
-        return
-      }
+    if (!name || !email || !phone || !file) {
+      showToast({
+        title: 'Campos obrigatórios',
+        message: 'Preencha nome, e-mail, telefone e currículo.',
+        type: 'error',
+      })
+      return
+    }
 
-      // Disable
-      submitBtn.disabled = true
-      submitBtn.classList.add('is-loading')
-      submitTxt.textContent = 'Enviando...'
+    // Disable
+    submitBtn.disabled = true
+    submitBtn.classList.add('is-loading')
+    submitTxt.textContent = 'Enviando...'
 
-      try {
-        const fd = new FormData(form)
-        fd.set('joborder_id', id)
+    try {
+      const fd = new FormData(form)
+      fd.set('joborder_id', id)
 
-        await submitApplication(fd)
+      await submitApplication(fd)
 
-        // Sucesso
-        appEl.innerHTML = successState(title, id)
+      // Sucesso
+      appEl.innerHTML = successState(title, id)
+    } catch (err) {
+      showToast({ title: 'Erro ao enviar', message: err.message, type: 'error' })
+      submitBtn.disabled = false
+      submitBtn.classList.remove('is-loading')
+      submitTxt.textContent = 'Enviar candidatura'
+    }
+  })
 
-      } catch (err) {
-        showToast({ title: 'Erro ao enviar', message: err.message, type: 'error' })
-        submitBtn.disabled = false
-        submitBtn.classList.remove('is-loading')
-        submitTxt.textContent = 'Enviar candidatura'
-      }
-    })
-
-    // Cancelar
-    document.getElementById('cancel-btn')?.addEventListener('click', () => {
-      navigate(`/jobs/${id}`)
-    })
-  }
+  // Cancelar
+  document.getElementById('cancel-btn')?.addEventListener('click', () => {
+    navigate(`/jobs/${id}`)
+  })
+}
 
 /* ─── Estado de sucesso ──────────────────────────────────────── */
 function successState(title, id) {
@@ -405,8 +417,10 @@ function successState(title, id) {
 /* ─── Helpers ─────────────────────────────────────────────── */
 function escHtml(str) {
   return String(str ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
 }
 
 const userIcon = () =>

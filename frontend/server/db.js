@@ -25,11 +25,11 @@ let pool = null
 export async function getDb() {
   if (!pool) {
     pool = mysql.createPool({
-      host:     process.env.DB_HOST     || 'localhost',
-      port:     parseInt(process.env.DB_PORT || '3306'),
-      database: process.env.DB_NAME     || 'cats',
-      user:     process.env.DB_USER     || 'ael_dev',
-      password: process.env.DB_PASS     || 'ael_dev_2024',
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT || '3306'),
+      database: process.env.DB_NAME || 'cats',
+      user: process.env.DB_USER || 'ael_dev',
+      password: process.env.DB_PASS || 'ael_dev_2024',
       waitForConnections: true,
       connectionLimit: 10,
       timezone: 'Z',

@@ -3,9 +3,9 @@
  * Listagem de vagas com hero, filtros e cards dinâmicos
  */
 
-import { getJobs, getFilters } from '../api.js'
-import { navigate } from '../router.js'
+import { getFilters, getJobs } from '../api.js'
 import { createCustomSelect } from '../components/CustomSelect.js'
+import { navigate } from '../router.js'
 
 let debounceTimer = null
 
@@ -239,7 +239,7 @@ export async function renderHome(params, appEl) {
 
   // Monta CustomSelects com itens padrão iniciais
   const initialDeptItems = [{ value: '', label: 'Todas as áreas' }]
-  const initialLocItems  = [{ value: '', label: 'Todas as localidades' }]
+  const initialLocItems = [{ value: '', label: 'Todas as localidades' }]
 
   const heroDeptContainer = document.getElementById('hero-dept-container')
   const heroDeptSelect = createCustomSelect({
@@ -247,7 +247,7 @@ export async function renderHome(params, appEl) {
     label: 'Todas as áreas',
     value: '',
     items: initialDeptItems,
-    theme: 'dark'
+    theme: 'dark',
   })
   if (heroDeptContainer) heroDeptContainer.appendChild(heroDeptSelect)
 
@@ -258,7 +258,7 @@ export async function renderHome(params, appEl) {
     value: '',
     items: initialDeptItems,
     theme: 'light',
-    onChange: () => onFilterChange()
+    onChange: () => onFilterChange(),
   })
   if (filterDeptContainer) filterDeptContainer.appendChild(filterDeptSelect)
 
@@ -269,24 +269,26 @@ export async function renderHome(params, appEl) {
     value: '',
     items: initialLocItems,
     theme: 'light',
-    onChange: () => onFilterChange()
+    onChange: () => onFilterChange(),
   })
   if (filterLocContainer) filterLocContainer.appendChild(filterLocSelect)
 
   // Carrega departamentos e localidades dinâmicos cadastrados pelo RH no OpenCATS
-  getFilters().then(({ departments, locations }) => {
-    if (departments && departments.length > 0) {
-      const deptItems = [{ value: '', label: 'Todas as áreas' }, ...departments]
-      heroDeptSelect.setItems(deptItems)
-      filterDeptSelect.setItems(deptItems)
-    }
-    if (locations && locations.length > 0) {
-      const locItems = [{ value: '', label: 'Todas as localidades' }, ...locations]
-      filterLocSelect.setItems(locItems)
-    }
-  }).catch(err => {
-    console.warn('Erro ao carregar filtros dinâmicos do OpenCATS:', err)
-  })
+  getFilters()
+    .then(({ departments, locations }) => {
+      if (departments && departments.length > 0) {
+        const deptItems = [{ value: '', label: 'Todas as áreas' }, ...departments]
+        heroDeptSelect.setItems(deptItems)
+        filterDeptSelect.setItems(deptItems)
+      }
+      if (locations && locations.length > 0) {
+        const locItems = [{ value: '', label: 'Todas as localidades' }, ...locations]
+        filterLocSelect.setItems(locItems)
+      }
+    })
+    .catch((err) => {
+      console.warn('Erro ao carregar filtros dinâmicos do OpenCATS:', err)
+    })
 
   // Anchor scroll para #vagas via hero CTA
   document.getElementById('hero-cta-vagas')?.addEventListener('click', (e) => {
@@ -297,7 +299,7 @@ export async function renderHome(params, appEl) {
   // Busca pelo card lateral do hero
   document.getElementById('hero-search-btn')?.addEventListener('click', () => {
     const search = document.getElementById('hero-search')?.value || ''
-    const dept   = heroDeptSelect.getValue()
+    const dept = heroDeptSelect.getValue()
     document.getElementById('filter-search').value = search
     filterDeptSelect.setValue(dept)
     document.getElementById('vagas')?.scrollIntoView({ behavior: 'smooth' })
@@ -311,9 +313,9 @@ export async function renderHome(params, appEl) {
     clearTimeout(debounceTimer)
     debounceTimer = setTimeout(() => {
       loadJobs({
-        search:     filterSearch.value,
+        search: filterSearch.value,
         department: filterDeptSelect.getValue(),
-        location:   filterLocSelect.getValue(),
+        location: filterLocSelect.getValue(),
       })
     }, 350)
   }
@@ -330,7 +332,7 @@ export async function renderHome(params, appEl) {
 }
 
 async function loadJobs({ search = '', department = '', location = '' } = {}) {
-  const list     = document.getElementById('jobs-list')
+  const list = document.getElementById('jobs-list')
   const countWrap = document.getElementById('jobs-count-wrap')
   if (!list) return
 
@@ -360,12 +362,13 @@ async function loadJobs({ search = '', department = '', location = '' } = {}) {
 
   try {
     const data = await getJobs({ search, department, location })
-    const jobs  = data.jobs || data
+    const jobs = data.jobs || data
 
     if (countWrap) {
-      countWrap.innerHTML = jobs.length > 0
-        ? `<span class="filter-count">${jobs.length} vaga${jobs.length !== 1 ? 's' : ''} encontrada${jobs.length !== 1 ? 's' : ''}</span>`
-        : ''
+      countWrap.innerHTML =
+        jobs.length > 0
+          ? `<span class="filter-count">${jobs.length} vaga${jobs.length !== 1 ? 's' : ''} encontrada${jobs.length !== 1 ? 's' : ''}</span>`
+          : ''
     }
 
     if (!jobs.length) {
@@ -386,7 +389,7 @@ async function loadJobs({ search = '', department = '', location = '' } = {}) {
     list.innerHTML = `<div class="jobs-grid">${jobs.map(jobCard).join('')}</div>`
 
     // Clique nos cards
-    list.querySelectorAll('.job-card').forEach(card => {
+    list.querySelectorAll('.job-card').forEach((card) => {
       card.addEventListener('click', (e) => {
         e.preventDefault()
         navigate(`/jobs/${card.dataset.id}`)
@@ -399,7 +402,6 @@ async function loadJobs({ search = '', department = '', location = '' } = {}) {
         }
       })
     })
-
   } catch (err) {
     list.innerHTML = `
       <div class="empty-state">
@@ -412,9 +414,9 @@ async function loadJobs({ search = '', department = '', location = '' } = {}) {
 }
 
 function jobCard(job) {
-  const dept     = job.department || job.departmentName || ''
+  const dept = job.department || job.departmentName || ''
   const location = [job.city, job.state].filter(Boolean).join(' — ') || job.location || ''
-  const type     = job.type || 'CLT'
+  const type = job.type || 'CLT'
 
   return `
     <article
@@ -434,16 +436,24 @@ function jobCard(job) {
       <p class="job-card-desc">${escHtml(job.description || 'Ver detalhes da oportunidade.')}</p>
 
       <div class="job-card-meta">
-        ${location ? `
+        ${
+          location
+            ? `
           <div class="job-card-meta-item">
             ${mapPinIcon()}
             <span>${escHtml(location)}</span>
-          </div>` : ''}
-        ${type ? `
+          </div>`
+            : ''
+        }
+        ${
+          type
+            ? `
           <div class="job-card-meta-item">
             ${briefcaseSmIcon()}
             <span>${escHtml(type)}</span>
-          </div>` : ''}
+          </div>`
+            : ''
+        }
       </div>
 
       <div class="job-card-footer">
@@ -471,7 +481,9 @@ function escHtml(str) {
 function formatDate(str) {
   try {
     return new Date(str).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  } catch { return '' }
+  } catch {
+    return ''
+  }
 }
 
 const mapPinIcon = () =>

@@ -3,10 +3,10 @@
  * Apenas Administradores (access_level >= 400) podem cadastrar, editar e excluir usuários.
  */
 
-import { Router } from 'express'
 import bcrypt from 'bcryptjs'
+import { Router } from 'express'
 import { getDb } from '../db.js'
-import { sendSuccess, sendError } from '../helpers.js'
+import { sendError, sendSuccess } from '../helpers.js'
 
 const router = Router()
 
@@ -45,7 +45,7 @@ router.get('/', async (req, res) => {
       ORDER BY u.access_level DESC, u.first_name ASC
     `)
 
-    const formattedUsers = users.map(u => ({
+    const formattedUsers = users.map((u) => ({
       ...u,
       role: u.access_level >= 400 ? 'Administrador' : 'Recrutador',
       is_admin: u.access_level >= 400,
@@ -87,27 +87,35 @@ router.post('/', requireSuperAdmin, async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10)
     const level = parseInt(access_level, 10) >= 400 ? 500 : 200
 
-    const [result] = await db.query(`
+    const [result] = await db.query(
+      `
       INSERT INTO user (
         user_name, first_name, last_name, email, password, 
         title, access_level, can_change_password, is_test_user
       ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0)
-    `, [
-      cleanUserName,
-      first_name.trim(),
-      last_name.trim(),
-      cleanEmail || null,
-      hashedPassword,
-      title?.trim() || (level >= 400 ? 'Administrador de RH' : 'Recrutador(a)'),
-      level
-    ])
+    `,
+      [
+        cleanUserName,
+        first_name.trim(),
+        last_name.trim(),
+        cleanEmail || null,
+        hashedPassword,
+        title?.trim() || (level >= 400 ? 'Administrador de RH' : 'Recrutador(a)'),
+        level,
+      ]
+    )
 
-    return sendSuccess(res, {
-      user_id: result.insertId,
-      user_name: cleanUserName,
-      full_name: `${first_name.trim()} ${last_name.trim()}`,
-      role: level >= 400 ? 'Administrador' : 'Recrutador',
-    }, 'Usuário criado com sucesso!', 201)
+    return sendSuccess(
+      res,
+      {
+        user_id: result.insertId,
+        user_name: cleanUserName,
+        full_name: `${first_name.trim()} ${last_name.trim()}`,
+        role: level >= 400 ? 'Administrador' : 'Recrutador',
+      },
+      'Usuário criado com sucesso!',
+      201
+    )
   } catch (err) {
     console.error('Erro ao cadastrar usuário:', err)
     return sendError(res, 'Erro ao criar usuário do RH.', 500)
@@ -137,10 +145,22 @@ router.put('/:id', requireSuperAdmin, async (req, res) => {
     const updates = []
     const params = []
 
-    if (first_name) { updates.push('first_name = ?'); params.push(first_name.trim()) }
-    if (last_name) { updates.push('last_name = ?'); params.push(last_name.trim()) }
-    if (email !== undefined) { updates.push('email = ?'); params.push(email?.trim().toLowerCase() || null) }
-    if (title !== undefined) { updates.push('title = ?'); params.push(title?.trim() || null) }
+    if (first_name) {
+      updates.push('first_name = ?')
+      params.push(first_name.trim())
+    }
+    if (last_name) {
+      updates.push('last_name = ?')
+      params.push(last_name.trim())
+    }
+    if (email !== undefined) {
+      updates.push('email = ?')
+      params.push(email?.trim().toLowerCase() || null)
+    }
+    if (title !== undefined) {
+      updates.push('title = ?')
+      params.push(title?.trim() || null)
+    }
     if (access_level !== undefined) {
       const level = parseInt(access_level, 10) >= 400 ? 500 : 200
       updates.push('access_level = ?')
