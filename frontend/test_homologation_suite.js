@@ -241,16 +241,15 @@ function createValidPdfBuffer(title = 'Curriculo do Candidato - A&L Talent') {
     const res2 = await apiRequest({ method: 'POST', path: '/api/talent-pool/register', body: b2, headers: { 'Content-Type': c2 }, isMultipart: true })
 
     const [candCount] = await db.query('SELECT COUNT(*) as total FROM candidate WHERE email1 = ?', [baseEmail.toLowerCase()])
-    const sameId = res1.data.candidate_id === res2.data.candidate_id
-
-    const passed = sameId && candCount[0].total === 1
+    const blocked409 = res2.statusCode === 409
+    const passed = blocked409 && candCount[0].total === 1
     results.push({
-      test: '3. Deduplicação de E-mail (Case & Trim)',
+      test: '3. Deduplicação e Bloqueio de E-mail Duplicado (Case & Trim)',
       status: passed ? 'APROVADO' : 'FALHOU',
-      detail: `IDs coincidem: ${sameId} (${res1.data.candidate_id}), Total registros: ${candCount[0].total}`
+      detail: `Cadastro inicial: ${res1.statusCode} (ID: ${res1.data.candidate_id}), 2ª tentativa bloqueada com HTTP 409: ${blocked409}, Total registros no banco: ${candCount[0].total}`
     })
   } catch (err) {
-    results.push({ test: '3. Deduplicação de E-mail', status: 'FALHOU', detail: err.message })
+    results.push({ test: '3. Deduplicação e Bloqueio de E-mail Duplicado', status: 'FALHOU', detail: err.message })
   }
 
   // ──────────────────────────────────────────────────────────────────

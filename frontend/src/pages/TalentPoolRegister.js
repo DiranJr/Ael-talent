@@ -102,9 +102,55 @@ export async function renderTalentPoolRegister(params, appEl) {
   let currentStep = 1
   const totalSteps = 6
   const lookupDone = false
+  const alreadyAppliedToJob = Boolean(
+    targetJob &&
+      loggedInCandidate?.applications?.some(
+        (a) => Number(a.joborder_id) === Number(targetJob.joborder_id || targetJob.id || jobId)
+      )
+  )
   let showAlreadyRegisteredScreen = Boolean(loggedInCandidate && !targetJob)
 
   function render() {
+    if (alreadyAppliedToJob && loggedInCandidate && targetJob) {
+      appEl.innerHTML = `
+        <div style="background: var(--ael-surface); min-height: calc(100vh - 80px); padding-top: calc(var(--ael-header-h) + 2rem); padding-bottom: 5rem; display: flex; align-items: center;">
+          <div class="container" style="max-width: 680px; margin-inline: auto;">
+            <div class="data-card" style="padding: 3.5rem 2.5rem; text-align: center; border: 1.5px solid var(--ael-green-base); box-shadow: 0 10px 30px rgba(0, 91, 58, 0.08);">
+              <div style="
+                width: 72px; height: 72px; border-radius: 50%;
+                background: rgba(0, 230, 118, 0.15); color: var(--ael-green-dark);
+                display: flex; align-items: center; justify-content: center;
+                margin-inline: auto; margin-bottom: 1.5rem; font-size: 2.25rem; font-weight: 800;
+              ">✓</div>
+
+              <span class="badge badge-accent" style="margin-bottom: 1rem; font-size: 0.8125rem; padding: 0.35rem 0.875rem;">
+                Candidatura Já Realizada
+              </span>
+
+              <h1 style="font-size: clamp(1.6rem, 3vw, 2rem); font-weight: 800; color: var(--ael-ink); margin-bottom: 0.75rem; line-height: 1.25;">
+                Você já está inscrito nesta vaga!
+              </h1>
+
+              <p style="color: var(--ael-text); font-size: 1rem; line-height: 1.6; margin-bottom: 2rem;">
+                Olá, <strong>${escHtml(loggedInCandidate.first_name)} ${escHtml(loggedInCandidate.last_name || '')}</strong>!<br>
+                Identificamos que seu cadastro com o e-mail <strong>${escHtml(loggedInCandidate.email)}</strong> já possui uma inscrição confirmada para a vaga <strong>"${escHtml(targetJob.title)}"</strong>.
+              </p>
+
+              <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+                <a href="#/candidato" class="btn btn-primary btn-lg">
+                  👤 Acessar Meu Painel de Candidato
+                </a>
+                <a href="#/jobs" class="btn btn-outline btn-lg">
+                  ⚡ Ver Outras Vagas
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+      return
+    }
+
     if (showAlreadyRegisteredScreen && loggedInCandidate) {
       appEl.innerHTML = `
         <div style="background: var(--ael-surface); min-height: calc(100vh - 80px); padding-top: calc(var(--ael-header-h) + 2rem); padding-bottom: 5rem; display: flex; align-items: center;">
@@ -372,8 +418,9 @@ export async function renderTalentPoolRegister(params, appEl) {
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="tp-email">E-mail * <span style="font-weight:400;color:var(--ael-muted);">(se já tiver cadastro, carregaremos seus dados)</span></label>
-            <input id="tp-email" name="email" type="email" class="form-control" placeholder="seu.email@exemplo.com" value="${escAttr(data.email)}" required />
+            <label class="form-label" for="tp-email">E-mail * <span style="font-weight:400;color:var(--ael-muted);">(seu e-mail principal para contato)</span></label>
+            <input id="tp-email" name="email" type="email" class="form-control" placeholder="seu.email@exemplo.com" value="${escAttr(data.email)}" ${data.is_authenticated ? 'readonly' : ''} required />
+            <div id="tp-email-feedback" style="display: none; margin-top: 0.5rem;"></div>
           </div>
 
 
@@ -946,7 +993,7 @@ export async function renderTalentPoolRegister(params, appEl) {
     }
   }
 
-  function validateStep(step) {
+  async function validateStep(step) {
     saveCurrentStepData()
     switch (step) {
       case 1:
@@ -966,7 +1013,37 @@ export async function renderTalentPoolRegister(params, appEl) {
           showToast({ title: 'Atenção', message: 'Informe sua cidade.', type: 'error' })
           return false
         }
+
+        // Validação se o e-mail já existe para candidato anônimo
         if (!formData.is_authenticated) {
+          try {
+            const check = await lookupCandidate(formData.email.trim().toLowerCase())
+            if (check?.exists) {
+              const emailFeedback = document.getElementById('tp-email-feedback')
+              if (emailFeedback) {
+                emailFeedback.style.display = 'block'
+                emailFeedback.innerHTML = `
+                  <div style="background: rgba(220, 38, 38, 0.08); border: 1.5px solid #dc2626; border-radius: var(--ael-radius-md); padding: 0.875rem 1.25rem; font-size: 0.875rem; color: #b91c1c; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                    <div>
+                      <strong>⚠️ Este e-mail já possui cadastro no Banco de Talentos.</strong><br>
+                      <span style="font-size: 0.8125rem; color: var(--ael-muted);">Faça login para se candidatar às vagas ou atualizar seus dados.</span>
+                    </div>
+                    <a href="#/candidato" class="btn btn-sm btn-primary" style="padding: 0.4rem 1rem; font-size: 0.8125rem; font-weight: 700;">👤 Fazer Login</a>
+                  </div>
+                `
+              }
+              showToast({
+                title: 'E-mail Já Cadastrado',
+                message: 'Este e-mail já está cadastrado em nosso sistema. Faça login para continuar.',
+                type: 'error',
+              })
+              document.getElementById('tp-email')?.focus()
+              return false
+            }
+          } catch (e) {
+            console.warn('Erro ao checar e-mail:', e)
+          }
+
           if (!formData.password || formData.password.length < 8) {
             showToast({
               title: 'Senha Obrigatória',
@@ -1041,6 +1118,48 @@ export async function renderTalentPoolRegister(params, appEl) {
   }
 
   function bindEvents() {
+    // Validação de E-mail Existente em Tempo Real (Step 1)
+    const emailInput = document.getElementById('tp-email')
+    const emailFeedback = document.getElementById('tp-email-feedback')
+
+    async function checkEmailExists() {
+      if (formData.is_authenticated) return
+      const val = emailInput?.value?.trim().toLowerCase()
+      if (!val || !val.includes('@') || val.length < 5) {
+        if (emailFeedback) {
+          emailFeedback.style.display = 'none'
+          emailFeedback.innerHTML = ''
+        }
+        return
+      }
+
+      try {
+        const check = await lookupCandidate(val)
+        if (check?.exists) {
+          if (emailFeedback) {
+            emailFeedback.style.display = 'block'
+            emailFeedback.innerHTML = `
+              <div style="background: rgba(220, 38, 38, 0.08); border: 1.5px solid #dc2626; border-radius: var(--ael-radius-md); padding: 0.875rem 1.25rem; font-size: 0.875rem; color: #b91c1c; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <div>
+                  <strong>⚠️ Este e-mail já possui cadastro no Banco de Talentos.</strong><br>
+                  <span style="font-size: 0.8125rem; color: var(--ael-muted);">Faça login para se candidatar às vagas ou atualizar seus dados.</span>
+                </div>
+                <a href="#/candidato" class="btn btn-sm btn-primary" style="padding: 0.4rem 1rem; font-size: 0.8125rem; font-weight: 700;">👤 Fazer Login</a>
+              </div>
+            `
+          }
+        } else {
+          if (emailFeedback) {
+            emailFeedback.style.display = 'none'
+            emailFeedback.innerHTML = ''
+          }
+        }
+      } catch (_) {}
+    }
+
+    emailInput?.addEventListener('blur', checkEmailExists)
+    emailInput?.addEventListener('change', checkEmailExists)
+
     // Adicionar / Remover Formações
     document.getElementById('add-education-btn')?.addEventListener('click', () => {
       saveCurrentStepData()
@@ -1123,13 +1242,20 @@ export async function renderTalentPoolRegister(params, appEl) {
     })
 
     // Avançar
-    document.getElementById('next-step-btn')?.addEventListener('click', () => {
-      if (validateStep(currentStep)) {
-        if (currentStep < totalSteps) {
-          currentStep++
-          render()
-          window.scrollTo({ top: 0, behavior: 'smooth' })
+    document.getElementById('next-step-btn')?.addEventListener('click', async () => {
+      const nextBtn = document.getElementById('next-step-btn')
+      if (nextBtn) nextBtn.disabled = true
+      try {
+        const isValid = await validateStep(currentStep)
+        if (isValid) {
+          if (currentStep < totalSteps) {
+            currentStep++
+            render()
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }
         }
+      } finally {
+        if (nextBtn) nextBtn.disabled = false
       }
     })
 
@@ -1167,7 +1293,7 @@ export async function renderTalentPoolRegister(params, appEl) {
     // Submit final
     document.getElementById('talent-pool-form')?.addEventListener('submit', async (e) => {
       e.preventDefault()
-      if (!validateStep(6)) return
+      if (!(await validateStep(6))) return
 
       const submitBtn = document.getElementById('submit-talent-btn')
       submitBtn.disabled = true

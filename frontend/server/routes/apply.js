@@ -100,20 +100,11 @@ export async function applyHandler(req, res) {
     )
 
     if (existingApp.length > 0) {
-      // Candidatura já existe — atualiza currículo se novo arquivo enviado
-      let attachmentId = null
-      if (resumeFile) {
-        attachmentId = await saveCandidateAttachment(conn, candidateId, resumeFile)
-      }
-      await conn.commit()
-      return sendSuccess(
+      await conn.rollback()
+      return sendError(
         res,
-        {
-          candidate_id: candidateId,
-          attachment_id: attachmentId,
-          is_update: true,
-        },
-        'Candidatura atualizada com sucesso!'
+        'Este e-mail já possui uma candidatura registrada para esta vaga. Acesse o Portal do Candidato para acompanhar sua inscrição.',
+        409
       )
     }
 

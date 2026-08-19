@@ -273,14 +273,14 @@ async function runHardeningTests() {
     body: { email: legacyEmail, password: 'senhaAlteradaViaBearer888' }
   })
 
-  const test4Pass = regExistingWithPwd.status === 200 &&
+  const test4Pass = regExistingWithPwd.status === 409 &&
     loginWithHackerPwd.status === 401 &&
     loginWithOriginalPwd.status === 200
 
   results.push({
-    test: '4. Bloqueio de Troca de Senha via /register para Candidato Existente',
+    test: '4. Bloqueio de Cadastro e Troca de Senha via /register para Candidato Existente',
     status: test4Pass ? 'APROVADO' : 'FALHOU',
-    detail: `Senha nova via /register rejeitada no login (401), Senha original mantida (200)`
+    detail: `Tentativa anônima rejeitada com status 409: ${regExistingWithPwd.status === 409}, Senha original mantida (200)`
   })
 
   // ─── TESTE 5: Proteção de PII e Anti-Enumeração em /lookup ────────

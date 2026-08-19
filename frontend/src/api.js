@@ -236,8 +236,15 @@ export async function adminDeleteUser(id) {
 /** Cadastro público no Banco de Talentos (com upload opcional) */
 export async function registerTalentPool(formData) {
   try {
+    const headers = {}
+    const candToken = getCandidateToken()
+    if (candToken) {
+      headers['Authorization'] = `Bearer ${candToken}`
+    }
+
     const res = await fetch(`${API_BASE}/talent-pool/register`, {
       method: 'POST',
+      headers,
       body: formData,
     })
 

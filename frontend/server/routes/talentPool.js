@@ -77,7 +77,7 @@ async function getFormattedCandidate(db, candidateId) {
 }
 
 // ============================================================================
-// 1. LOOKUP DE STATUS DE CADASTRO POR E-MAIL (Proteção de PII & Anti-Enumeração)
+// 1. LOOKUP DE STATUS DE CADASTRO POR E-MAIL (Verificação de Disponibilidade)
 // ============================================================================
 router.get('/lookup', async (req, res) => {
   try {
@@ -86,8 +86,17 @@ router.get('/lookup', async (req, res) => {
       return sendError(res, 'E-mail é obrigatório.', 400)
     }
 
-    // Resposta segura e genérica sem expor se o e-mail existe nem PII (primeiro nome, senha, etc.)
-    return res.json({ status: 'ok' })
+    const cleanEmail = email.trim().toLowerCase()
+    const db = await getDb()
+    const [cand] = await db.query(
+      'SELECT candidate_id FROM candidate WHERE email1 = ? OR email2 = ? LIMIT 1',
+      [cleanEmail, cleanEmail]
+    )
+
+    return res.json({
+      status: 'ok',
+      exists: cand.length > 0,
+    })
   } catch (err) {
     console.error('Erro no lookup do candidato:', err)
     return sendError(res, 'Erro ao verificar e-mail.', 500)
@@ -653,7 +662,7 @@ router.post(
       const cleanFirst = first_name.trim()
       const cleanLast = last_name.trim()
 
-      // 1. DEDUPLICAÇÃO NATIVA
+      // 1. DEDUPLICAÇÃO & BLOQUEIO DE CADASTRO DUPLICADO
       const [existing] = await conn.query(
         'SELECT candidate_id, source FROM candidate WHERE email1 = ? OR email2 = ? LIMIT 1',
         [cleanEmail, cleanEmail]
@@ -662,10 +671,31 @@ router.post(
       let candidateId
       let isNew = false
 
+      // Verifica se o usuário enviou um token válido de autenticação
+      const authHeader = req.headers.authorization
+      let authenticatedCandidateId = null
+      if (authHeader?.startsWith('Bearer ')) {
+        const token = authHeader.split(' ')[1]
+        const payload = verifyCandidateToken(token)
+        if (payload?.candidate_id) {
+          authenticatedCandidateId = payload.candidate_id
+        }
+      }
+
       const mainEmployer = experiencesList[0]?.company || req.body.current_employer || ''
       const mainRole = experiencesList[0]?.role || req.body.last_role || desired_role || ''
 
       if (existing.length > 0) {
+        // Se o e-mail já existe e quem está enviando NÃO é o candidato autenticado:
+        if (!authenticatedCandidateId || Number(authenticatedCandidateId) !== Number(existing[0].candidate_id)) {
+          await conn.rollback()
+          return sendError(
+            res,
+            'Este e-mail já possui cadastro em nosso sistema. Por favor, acesse a Área do Candidato para entrar com sua senha ou recuperar seu acesso.',
+            409
+          )
+        }
+
         candidateId = existing[0].candidate_id
         await conn.query(
           `UPDATE candidate SET
@@ -804,21 +834,28 @@ router.post(
               [candidateId, jobId]
             )
 
-            if (existsInJob.length === 0) {
-              await conn.query(
-                `INSERT INTO candidate_joborder (
-                candidate_id, joborder_id, status, added_by, date_created, date_modified
-              ) VALUES (?, ?, 100, 0, NOW(), NOW())`,
-                [candidateId, jobId]
-              )
-
-              await conn.query(
-                `INSERT INTO candidate_joborder_status_history (
-                candidate_id, joborder_id, date, status_from, status_to
-              ) VALUES (?, ?, NOW(), 0, 100)`,
-                [candidateId, jobId]
+            if (existsInJob.length > 0) {
+              await conn.rollback()
+              return sendError(
+                res,
+                `Este e-mail já possui uma candidatura registrada para a vaga "${appliedJobTitle}". Acesse a Área do Candidato para acompanhar o processo seletivo.`,
+                409
               )
             }
+
+            await conn.query(
+              `INSERT INTO candidate_joborder (
+              candidate_id, joborder_id, status, added_by, date_created, date_modified
+            ) VALUES (?, ?, 100, 0, NOW(), NOW())`,
+              [candidateId, jobId]
+            )
+
+            await conn.query(
+              `INSERT INTO candidate_joborder_status_history (
+              candidate_id, joborder_id, date, status_from, status_to
+            ) VALUES (?, ?, NOW(), 0, 100)`,
+              [candidateId, jobId]
+            )
           }
         }
       }
